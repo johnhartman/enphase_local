@@ -70,29 +70,26 @@ Paste the new token into `.enphase_token` and restart.
 ## Start automatically (macOS)
 
 ```bash
-mkdir -p ~/Library/LaunchAgents
-cat > ~/Library/LaunchAgents/com.enphase.localmonitor.plist <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-  <key>Label</key><string>com.enphase.localmonitor</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>$(which node)</string>
-    <string>/Users/john/enphase_local/build-server/server.js</string>
-  </array>
-  <key>WorkingDirectory</key><string>/Users/john/enphase_local</string>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>/Users/john/enphase_local/monitor.log</string>
-  <key>StandardErrorPath</key><string>/Users/john/enphase_local/monitor.log</string>
-</dict></plist>
-EOF
-launchctl load ~/Library/LaunchAgents/com.enphase.localmonitor.plist
+sudo ./deploy/install-daemon.sh
 ```
 
-It will start at login and restart if it crashes. `launchctl unload …` stops it.
+This installs a **LaunchDaemon**: the monitor starts at boot — before anyone
+logs in — restarts if it crashes, and runs as your normal user (not root).
+That's what you want on a headless or appliance Mac; no auto-login needed.
+
+```bash
+./deploy/install-daemon.sh --status        # is it running?
+tail -f monitor.log                        # server output
+sudo ./deploy/install-daemon.sh            # re-run after npm run build to pick up changes
+sudo ./deploy/install-daemon.sh --uninstall
+```
+
+For unattended recovery after a power cycle, also set the machine itself up
+as an appliance: `sudo pmset -a sleep 0 disablesleep 1 autorestart 1`, and
+leave FileVault off on this Mac — an encrypted boot disk stops at the unlock
+screen and the daemon never starts. Saving the gateway's `Envoy_XXXXXX`
+Wi-Fi network with auto-join gives you hands-off hotspot failover if the
+router dies mid-outage.
 
 ## Configuration (environment variables)
 
