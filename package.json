@@ -1,0 +1,28 @@
+{
+  "name": "enphase-local-monitor",
+  "version": "1.0.0",
+  "description": "Local dashboard for an Enphase system — reads the IQ Gateway directly, no internet required",
+  "scripts": {
+    "build": "tsc --noEmit -p tsconfig.json && vite build && tsc -p tsconfig.server.json",
+    "start": "node build-server/server.js",
+    "dev": "vite"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "vite-plugin-singlefile": "^2.3.3"
+  },
+  "type": "module",
+  "private": true
+}

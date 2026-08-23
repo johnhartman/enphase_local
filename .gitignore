@@ -1,0 +1,5 @@
+node_modules/
+.enphase_token
+.enphase_credentials.json
+history.jsonl
+*.log
