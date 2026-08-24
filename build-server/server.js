@@ -62,8 +62,9 @@ function parseHost(value) {
         return { hostname: match[1], port: Number(match[2]) };
     return { hostname: value, port: 443 };
 }
-function gatewayGet(host, urlPath) {
+function gatewayRequest(host, urlPath, body) {
     const { hostname, port } = parseHost(host);
+    const payload = body === undefined ? null : JSON.stringify(body);
     return new Promise((resolve, reject) => {
         const fail = (error, code) => {
             reject(Object.assign(error, { code }));
@@ -72,11 +73,17 @@ function gatewayGet(host, urlPath) {
             hostname,
             port,
             path: urlPath,
-            method: 'GET',
+            method: payload === null ? 'GET' : 'POST',
             // The gateway serves a self-signed cert on your own LAN; the bearer
             // token is what authenticates this connection.
             rejectUnauthorized: false,
-            headers: { Authorization: `Bearer ${tokens.current ?? ''}` },
+            headers: {
+                Authorization: `Bearer ${tokens.current ?? ''}`,
+                ...(payload === null ? {} : {
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(payload),
+                }),
+            },
             timeout: CONFIG.requestTimeoutMs,
         }, (response) => {
             let body = '';
@@ -98,18 +105,20 @@ function gatewayGet(host, urlPath) {
         });
         request.on('timeout', () => { request.destroy(); fail(new Error('timeout'), 'NET'); });
         request.on('error', (error) => fail(error, 'NET'));
+        if (payload !== null)
+            request.write(payload);
         request.end();
     });
 }
 /** Try the last-good host first, then the other one; remember the winner. */
-async function fetchWithFailover(urlPath) {
+async function fetchWithFailover(urlPath, body) {
     const order = activeHost === CONFIG.gatewayHost
         ? [CONFIG.gatewayHost, CONFIG.fallbackHost]
         : [CONFIG.fallbackHost, CONFIG.gatewayHost];
     let lastError = Object.assign(new Error('unreachable'), { code: 'NET' });
     for (const host of order) {
         try {
-            const data = await gatewayGet(host, urlPath);
+            const data = await gatewayRequest(host, urlPath, body);
             if (host !== activeHost)
                 console.log(`[gateway] now reachable at ${host}`);
             activeHost = host;
@@ -140,11 +149,18 @@ async function takeSample() {
     catch { /* meters are optional; SOC is the thing that matters */ }
     let live = undefined;
     try {
-        const status = (await fetchWithFailover('/ivp/livedata/status'));
+        let status = (await fetchWithFailover('/ivp/livedata/status'));
+        if (status?.connection?.sc_stream !== 'enabled') {
+            // The gateway switches its live stream off on its own and leaves it off
+            // until asked again, which is why solar/load/grid/battery would go null
+            // a few samples after startup. Ask, then re-read.
+            await fetchWithFailover('/ivp/livedata/stream', { enable: 1 });
+            status = (await fetchWithFailover('/ivp/livedata/status'));
+        }
         if (status?.connection?.sc_stream === 'enabled')
             live = status.meters;
     }
-    catch { /* livedata stream may be disabled; fine */ }
+    catch { /* stream unavailable; SOC is the thing that matters */ }
     let solarW = pickMeter(production, 'production', 'production');
     if (solarW === null) {
         const inverters = production?.production?.find((entry) => entry.type === 'inverters');
