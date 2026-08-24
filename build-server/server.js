@@ -343,9 +343,19 @@ setInterval(() => { void poll(); }, CONFIG.sampleSeconds * 1000);
 setInterval(() => { pruneHistory(); rewriteHistory(); }, 3600 * 1000);
 // Check daily whether the monthly refresh is due; harmless no-op otherwise.
 setInterval(() => { void tokens.refresh(); }, 24 * 3600 * 1000);
+let shuttingDown = false;
 for (const signal of ['SIGINT', 'SIGTERM']) {
     process.on(signal, () => {
+        // Under `npm start` a single ^C reaches us twice: once from the terminal's
+        // process group, once forwarded by npm. Only act on the first.
+        if (shuttingDown)
+            return;
+        shuttingDown = true;
         console.log('\nstopping');
         server.close(() => process.exit(0));
+        // An open dashboard tab keeps re-using its keep-alive socket, so it never
+        // goes idle and close() would otherwise wait forever.
+        server.closeAllConnections();
+        setTimeout(() => process.exit(0), 2000).unref();
     });
 }
