@@ -63,6 +63,33 @@ function nearestIndex(times: number[], target: number): number {
   return Math.abs(times[low] - target) <= Math.abs(times[high] - target) ? low : high;
 }
 
+/** Tick spacing in minutes by chart span: 15 min on a 1 h chart, hourly on 6 h, 6 h beyond. */
+function tickStepMinutes(spanHours: number): number {
+  if (spanHours <= 1.5) return 15;
+  if (spanHours <= 8) return 60;
+  return 360;
+}
+
+/**
+ * Tick times aligned to the local clock (e.g. 00:00, 06:00, 12:00, 18:00)
+ * rather than spread evenly across the data. Built day by day with Date
+ * arithmetic so DST changes keep ticks on round wall-clock times.
+ */
+function clockTicks(t0: number, t1: number): number[] {
+  const step = tickStepMinutes((t1 - t0) / 3600);
+  const out: number[] = [];
+  const day = new Date(t0 * 1000);
+  day.setHours(0, 0, 0, 0);
+  while (day.getTime() / 1000 <= t1) {
+    for (let minutes = 0; minutes < 24 * 60; minutes += step) {
+      const tick = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, minutes).getTime() / 1000;
+      if (tick >= t0 && tick <= t1) out.push(tick);
+    }
+    day.setDate(day.getDate() + 1);
+  }
+  return out;
+}
+
 interface EndLabel { key: string; label: string; color: string; y: number }
 
 /** Push labels apart so end-of-line text never overlaps. */
@@ -126,10 +153,7 @@ export default function LineChart({
   );
 
   const yTicks = useMemo(() => niceTicks(bounds[0], bounds[1], 4), [bounds]);
-  const xTicks = useMemo(() => {
-    if (times.length < 2) return [];
-    return [0, 0.33, 0.66, 1].map((fraction) => t0 + (t1 - t0) * fraction);
-  }, [times.length, t0, t1]);
+  const xTicks = useMemo(() => (times.length < 2 ? [] : clockTicks(t0, t1)), [times.length, t0, t1]);
   // Clock time alone is ambiguous once the axis crosses midnight (a 48 h chart
   // shows the same times twice), so add the weekday whenever the ticks span
   // more than one calendar day.
