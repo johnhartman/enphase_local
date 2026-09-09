@@ -263,15 +263,23 @@ export default function LineChart({
             ))}
 
             {xTicks.map((tick) => (
-              <text
-                key={tick}
-                className="tick"
-                x={scaleX(tick)}
-                y={baseline + 16}
-                textAnchor="middle"
-              >
-                {formatXTick(tick)}
-              </text>
+              <g key={tick}>
+                <line
+                  className="axis"
+                  x1={scaleX(tick)}
+                  x2={scaleX(tick)}
+                  y1={baseline}
+                  y2={baseline + 5}
+                />
+                <text
+                  className="tick"
+                  x={scaleX(tick)}
+                  y={baseline + 18}
+                  textAnchor="middle"
+                >
+                  {formatXTick(tick)}
+                </text>
+              </g>
             ))}
 
             <line className="axis" x1={PAD.left} x2={PAD.left + innerWidth} y1={baseline} y2={baseline} />
