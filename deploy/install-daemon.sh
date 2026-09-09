@@ -111,7 +111,7 @@ case "${1:-install}" in
     echo "Installed. The monitor now starts at boot, before login."
     echo "  status:    ./deploy/install-daemon.sh --status"
     echo "  logs:      tail -f ${PROJECT_DIR}/monitor.log"
-    echo "  dashboard: http://localhost:8787"
+    echo "  dashboard: https://localhost  (http:// redirects; self-signed cert)"
     ;;
 
   *)

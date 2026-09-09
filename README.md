@@ -27,9 +27,19 @@ chmod 600 .enphase_token
 npm start
 ```
 
-Then open **http://localhost:8787** on this Mac, or the LAN URL the server
-prints (e.g. `http://192.168.0.x:8787`) on any phone or tablet on your
-Wi-Fi. Add it to a phone home screen for one-tap access.
+Then open **https://localhost** on this Mac, or the LAN URL the server
+prints (e.g. `https://192.168.0.x`) on any phone or tablet on your Wi-Fi.
+Plain `http://` addresses redirect to `https://`. Add it to a phone home
+screen for one-tap access.
+
+The dashboard is served over TLS so the browser treats it as a secure
+context, which desktop notifications require. On first start the server
+mints a self-signed certificate (`cert.pem` / `key.pem` in the project
+root, valid ten years, naming localhost, this machine's hostname and its
+LAN addresses) using the system `openssl`. Each browser shows a one-time
+"not private" warning until you trust that certificate on the device;
+delete the two files and restart to mint a fresh one (for example after
+the machine's IP changes).
 
 ## During an outage
 
@@ -97,7 +107,10 @@ router dies mid-outage.
 |---|---|---|
 | `GATEWAY_HOST` | `192.168.0.148` | Gateway LAN IP (reserve it in your router) |
 | `GATEWAY_FALLBACK` | `172.30.1.1` | Gateway hotspot address |
-| `PORT` | `8787` | Dashboard port |
+| `PORT` | `443` | Dashboard (HTTPS) port |
+| `HTTP_PORT` | `80` | Plain-HTTP port that redirects to the dashboard |
+| `TLS_CERT` | `cert.pem` | Certificate to serve (minted if missing) |
+| `TLS_KEY` | `key.pem` | Private key for `TLS_CERT` (minted if missing) |
 | `SAMPLE_SECONDS` | `30` | Poll interval |
 | `HISTORY_HOURS` | `48` | History retention |
 | `GATEWAY_SERIAL` | `482513006020` | Used in renewal URLs |

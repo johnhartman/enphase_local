@@ -11,6 +11,7 @@
  *   npm start
  *   GATEWAY_HOST=172.30.1.1 npm start     # when joined to the Envoy hotspot
  */
+import { execFileSync } from 'node:child_process';
 import http from 'node:http';
 import https from 'node:https';
 import fs from 'node:fs';
@@ -25,7 +26,12 @@ const CONFIG = {
     // With the router dead you join the gateway's own Envoy_XXXXXX hotspot,
     // where it always answers on this address. Tried automatically.
     fallbackHost: process.env.GATEWAY_FALLBACK || '172.30.1.1',
-    port: Number(process.env.PORT || 8787),
+    // The dashboard is served over TLS so the browser treats it as a secure
+    // context (required for desktop notifications). Plain HTTP only redirects.
+    port: Number(process.env.PORT || 443),
+    httpPort: Number(process.env.HTTP_PORT || 80),
+    certFile: process.env.TLS_CERT || path.join(ROOT, 'cert.pem'),
+    keyFile: process.env.TLS_KEY || path.join(ROOT, 'key.pem'),
     sampleSeconds: Number(process.env.SAMPLE_SECONDS || 30),
     historyHours: Number(process.env.HISTORY_HOURS || 48),
     historyFile: process.env.HISTORY_FILE || path.join(ROOT, 'history.jsonl'),
@@ -284,7 +290,7 @@ async function runPoll() {
             void tokens.refresh(true);
     }
 }
-// ---------------------------------------------------------------- http
+// ---------------------------------------------------------------- static
 const MIME = {
     '.html': 'text/html; charset=utf-8',
     '.js': 'text/javascript; charset=utf-8',
@@ -323,8 +329,54 @@ function serveStatic(res, urlPath) {
         res.end(data);
     });
 }
-const server = http.createServer((req, res) => {
-    const url = new URL(req.url ?? '/', 'http://localhost');
+// ---------------------------------------------------------------- tls
+/**
+ * Load the certificate pair, minting a self-signed one with the system
+ * openssl on first start. The cert names localhost, this machine's hostname
+ * and every LAN address it has right now, and lasts ten years, so the
+ * appliance keeps working with the internet down. Browsers warn once per
+ * device until the cert is trusted there.
+ */
+function ensureCertificate() {
+    if (!fs.existsSync(CONFIG.certFile) || !fs.existsSync(CONFIG.keyFile)) {
+        const names = [
+            'DNS:localhost',
+            `DNS:${os.hostname()}`,
+            'IP:127.0.0.1',
+            ...lanAddresses().map((address) => `IP:${address}`),
+        ];
+        // A config file rather than -addext, so LibreSSL (macOS) and OpenSSL both work.
+        const confFile = path.join(os.tmpdir(), `enphase-local-openssl-${process.pid}.cnf`);
+        fs.writeFileSync(confFile, [
+            '[req]',
+            'distinguished_name = dn',
+            'x509_extensions = ext',
+            'prompt = no',
+            '[dn]',
+            'CN = Enphase local monitor',
+            '[ext]',
+            `subjectAltName = ${names.join(',')}`,
+            'basicConstraints = CA:FALSE',
+            'keyUsage = digitalSignature, keyEncipherment',
+            'extendedKeyUsage = serverAuth',
+        ].join('\n'));
+        try {
+            execFileSync('openssl', [
+                'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-sha256', '-days', '3650',
+                '-config', confFile, '-keyout', CONFIG.keyFile, '-out', CONFIG.certFile,
+            ], { stdio: ['ignore', 'ignore', 'pipe'] });
+        }
+        finally {
+            fs.rmSync(confFile, { force: true });
+        }
+        fs.chmodSync(CONFIG.keyFile, 0o600);
+        console.log(`[tls] minted self-signed certificate ${path.basename(CONFIG.certFile)} for ${names.join(', ')}`);
+    }
+    return { key: fs.readFileSync(CONFIG.keyFile), cert: fs.readFileSync(CONFIG.certFile) };
+}
+// ---------------------------------------------------------------- http
+const server = https.createServer(ensureCertificate(), (req, res) => {
+    const url = new URL(req.url ?? '/', 'https://localhost');
     if (url.pathname === '/api/status') {
         const respond = () => sendJson(res, 200, {
             ok: !lastError,
@@ -365,6 +417,19 @@ function lanAddresses() {
 loadHistory();
 void poll();
 void tokens.refresh(); // monthly refresh, first checked at startup
+const portSuffix = CONFIG.port === 443 ? '' : `:${CONFIG.port}`;
+// Plain HTTP only bounces to the TLS listener, keeping the port in the URL
+// unless it is the default. Losing this listener is not fatal: the dashboard
+// is still reachable over https, so log and carry on.
+const redirect = http.createServer((req, res) => {
+    const host = (req.headers.host ?? 'localhost').replace(/:\d+$/, '');
+    res.writeHead(301, { Location: `https://${host}${portSuffix}${req.url ?? '/'}` });
+    res.end();
+});
+redirect.on('error', (err) => {
+    console.error(`[http] redirect listener on :${CONFIG.httpPort} failed (${err.code ?? err.message}); https still serves`);
+});
+redirect.listen(CONFIG.httpPort, '0.0.0.0');
 server.listen(CONFIG.port, '0.0.0.0', () => {
     const { expiresAt } = tokens.claims();
     console.log(`
@@ -373,11 +438,12 @@ Enphase local monitor
   sampling  every ${CONFIG.sampleSeconds}s, keeping ${CONFIG.historyHours}h
   token     ${expiresAt ? `valid until ${new Date(expiresAt * 1000).toISOString().slice(0, 10)}` : 'expiry unknown'}${tokens.autoRefreshConfigured ? ', auto-refreshes monthly' : ' — auto-refresh NOT configured (see README)'}
 
-  on this machine   http://localhost:${CONFIG.port}`);
+  on this machine   https://localhost${portSuffix}`);
     for (const address of lanAddresses()) {
-        console.log(`  on the LAN        http://${address}:${CONFIG.port}`);
+        console.log(`  on the LAN        https://${address}${portSuffix}`);
     }
-    console.log('');
+    console.log(`  http://…:${CONFIG.httpPort} redirects here; self-signed cert, so expect a one-time browser warning per device
+`);
 });
 setInterval(() => { void poll(); }, CONFIG.sampleSeconds * 1000);
 setInterval(() => { pruneHistory(); rewriteHistory(); }, 3600 * 1000);
@@ -392,6 +458,8 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
             return;
         shuttingDown = true;
         console.log('\nstopping');
+        redirect.close();
+        redirect.closeAllConnections();
         server.close(() => process.exit(0));
         // An open dashboard tab keeps re-using its keep-alive socket, so it never
         // goes idle and close() would otherwise wait forever.

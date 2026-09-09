@@ -3,3 +3,5 @@ node_modules/
 .enphase_credentials.json
 history.jsonl
 *.log
+cert.pem
+key.pem

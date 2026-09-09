@@ -24,8 +24,10 @@ run as an unattended appliance.
 
 - `server/` — TypeScript, compiled to `build-server/` by `tsc`. Zero runtime
   deps; plain Node 18+. Single process: polls gateway every 30 s, appends to
-  `history.jsonl` (48 h rolling, hourly rewrite), serves UI + JSON API on
-  `:8787`, auto-fails-over between LAN IP and hotspot IP.
+  `history.jsonl` (48 h rolling, hourly rewrite), serves UI + JSON API over
+  HTTPS on `:443` (self-signed `cert.pem`/`key.pem` minted on first start
+  with the system openssl; `:80` redirects), auto-fails-over between LAN IP
+  and hotspot IP.
 - `src/` — React 19 + TypeScript UI, built by Vite into ONE self-contained
   `dist/index.html` (no external resources — must work with internet down).
 - `server/token.ts` — TokenManager: monthly token re-mint using Enlighten
@@ -33,14 +35,14 @@ run as an unattended appliance.
   git). Does NOT support Enphase accounts with MFA.
 - API: `GET /api/status` (live sample + token status), `GET /api/history?hours=N`.
 - Secrets/state never in git: `.enphase_token`, `.enphase_credentials.json`,
-  `history.jsonl`, `*.log` (see .gitignore).
+  `history.jsonl`, `*.log`, `cert.pem`, `key.pem` (see .gitignore).
 
 ## Commands
 
 - `npm run build` — typecheck app, bundle UI, compile server. Prebuilt output
   is committed, so build only after source changes; commit rebuilt output.
 - `npm start` — run in foreground (dev).
-- `npm run dev` — Vite hot reload on :5173, proxies /api to :8787.
+- `npm run dev` — Vite hot reload on :5173, proxies /api to https://localhost:443.
 - `sudo ./deploy/install-daemon.sh` — install/update the LaunchDaemon
   (starts at boot pre-login, runs as the invoking user, logs to
   `monitor.log`). `--status`, `--uninstall`, `--print-plist`.
@@ -56,7 +58,8 @@ run as an unattended appliance.
 6. Save the `Envoy_XXXXXX` Wi-Fi network with auto-join (hotspot failover);
    prefer Ethernet for normal operation. Give this Mac a DHCP reservation.
 7. Acceptance test: pull power, box must boot to a working dashboard at
-   `http://<this-ip>:8787` with no login.
+   `https://<this-ip>` with no login (accept the self-signed cert once per
+   device; `http://<this-ip>` must redirect there).
 
 ## Open verification items
 
