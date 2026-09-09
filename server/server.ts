@@ -294,7 +294,20 @@ function recordSample(sample: Sample): void {
   });
 }
 
-async function poll(): Promise<void> {
+// While the gateway is down, each poll blocks for the full timeout on both
+// hosts, and every dashboard refresh would otherwise queue another one. Share
+// the in-flight poll instead, so callers wait on the same request and no burst
+// of stacked samples lands when the gateway comes back.
+let inFlight: Promise<void> | null = null;
+
+function poll(): Promise<void> {
+  if (!inFlight) {
+    inFlight = runPoll().finally(() => { inFlight = null; });
+  }
+  return inFlight;
+}
+
+async function runPoll(): Promise<void> {
   try {
     latest = await takeSample();
     lastError = null;

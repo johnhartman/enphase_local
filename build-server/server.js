@@ -244,7 +244,18 @@ function recordSample(sample) {
             console.error('[history] append failed:', err.message);
     });
 }
-async function poll() {
+// While the gateway is down, each poll blocks for the full timeout on both
+// hosts, and every dashboard refresh would otherwise queue another one. Share
+// the in-flight poll instead, so callers wait on the same request and no burst
+// of stacked samples lands when the gateway comes back.
+let inFlight = null;
+function poll() {
+    if (!inFlight) {
+        inFlight = runPoll().finally(() => { inFlight = null; });
+    }
+    return inFlight;
+}
+async function runPoll() {
     try {
         latest = await takeSample();
         lastError = null;
