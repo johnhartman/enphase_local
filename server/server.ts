@@ -226,11 +226,20 @@ async function takeSample(): Promise<Sample> {
     if (gridW === null) gridW = mwToW(live.grid?.agg_p_mw);
   }
 
+  const capWh = secctrl.Enc_max_available_capacity ?? secctrl.Max_energy ?? null;
+  // A gateway that has just rebooted answers before it has re-discovered the
+  // batteries: agg_soc 0, capacity 0, SOH 0, default reserve. Recording that
+  // would chart a phantom discharge and trip the low-charge alert, so treat
+  // it as a failed poll and keep the last good sample current.
+  if (capWh === 0) {
+    throw Object.assign(new Error('reports no battery capacity'), { code: 'NOTREADY' });
+  }
+
   return {
     t: Math.round(Date.now() / 1000),
     soc: secctrl.agg_soc ?? null,
     availWh: secctrl.ENC_agg_avail_energy ?? secctrl.Max_energy ?? null,
-    capWh: secctrl.Enc_max_available_capacity ?? secctrl.Max_energy ?? null,
+    capWh,
     sohPct: secctrl.ENC_agg_soh ?? null,
     reservePct: secctrl.configured_backup_soc ?? null,
     offGrid: Boolean(secctrl.offgrid_secctrl?.is_active),
@@ -298,10 +307,15 @@ async function poll(): Promise<void> {
         message: 'The gateway rejected the token — it has most likely expired.',
         renewUrl: `https://enlighten.enphaseenergy.com/entrez-auth-token?serial_num=${CONFIG.serial}`,
       }
-      : {
-        kind: 'network',
-        message: `Cannot reach the gateway (${failure.message}). Tried ${CONFIG.gatewayHost} and ${CONFIG.fallbackHost}.`,
-      };
+      : failure.code === 'NOTREADY'
+        ? {
+          kind: 'network',
+          message: `The gateway answered but ${failure.message} — it is probably restarting. Showing the last good sample.`,
+        }
+        : {
+          kind: 'network',
+          message: `Cannot reach the gateway (${failure.message}). Tried ${CONFIG.gatewayHost} and ${CONFIG.fallbackHost}.`,
+        };
     console.error('[poll]', lastError.message);
     // A rejected token with auto-refresh configured: try to fix it now.
     if (failure.code === 'TOKEN') void tokens.refresh(true);
