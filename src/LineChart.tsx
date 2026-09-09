@@ -130,6 +130,17 @@ export default function LineChart({
     if (times.length < 2) return [];
     return [0, 0.33, 0.66, 1].map((fraction) => t0 + (t1 - t0) * fraction);
   }, [times.length, t0, t1]);
+  // Clock time alone is ambiguous once the axis crosses midnight (a 48 h chart
+  // shows the same times twice), so add the weekday whenever the ticks span
+  // more than one calendar day.
+  const formatXTick = useMemo(() => {
+    const days = new Set(xTicks.map((tick) => new Date(tick * 1000).toDateString()));
+    const options: Intl.DateTimeFormatOptions = days.size > 1
+      ? { weekday: 'short', hour: 'numeric', minute: '2-digit' }
+      : { hour: 'numeric', minute: '2-digit' };
+    const formatter = new Intl.DateTimeFormat([], options);
+    return (tick: number) => formatter.format(new Date(tick * 1000));
+  }, [xTicks]);
 
   const paths = useMemo(() => series.map((line) => {
     let d = '';
@@ -235,7 +246,7 @@ export default function LineChart({
                 y={baseline + 16}
                 textAnchor="middle"
               >
-                {new Date(tick * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                {formatXTick(tick)}
               </text>
             ))}
 
