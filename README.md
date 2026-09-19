@@ -5,6 +5,8 @@ Gateway on your LAN** — no internet, no Enphase cloud. Built for outages:
 as long as the gateway and this machine have power, you can see battery
 charge, solar, house load, and a runtime estimate.
 
+![Dashboard showing battery charge, live solar, house, battery and grid power, charge and power-flow charts, and alert settings](docs/screenshot.png)
+
 - **Server** (`server/`, TypeScript, zero runtime dependencies): holds your
   token, polls the gateway every 30 s, keeps 48 h of history on disk, serves
   the UI to every device on your network.
