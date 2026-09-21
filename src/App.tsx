@@ -48,7 +48,7 @@ export default function App() {
     let cancelled = false;
     const tick = async () => {
       try {
-        const data = await getJson<StatusResponse>('/api/status');
+        const data = await getJson<StatusResponse>(`/api/status?avgHours=${settings.runtimeAvgHours}`);
         if (!cancelled) { setStatus(data); setFetchError(null); }
       } catch (err) {
         if (!cancelled) setFetchError(err instanceof Error ? err.message : String(err));
@@ -57,7 +57,7 @@ export default function App() {
     void tick();
     const timer = window.setInterval(() => { void tick(); }, STATUS_POLL_MS);
     return () => { cancelled = true; window.clearInterval(timer); };
-  }, []);
+  }, [settings.runtimeAvgHours]);
 
   useEffect(() => {
     let cancelled = false;
@@ -207,7 +207,15 @@ export default function App() {
                 ? (avgDrainW !== null && avgDrainW <= 50 ? 'solar covering load' : '—')
                 : `${formatDuration(hours)} ${sample?.offGrid ? 'left' : 'if grid dropped'}`}
               <span className="note">
-                {' '}at the last hour's usage · {hoursNow === null
+                {' '}averaged over{' '}
+                <select
+                  aria-label="Runtime averaging window"
+                  value={settings.runtimeAvgHours}
+                  onChange={(event) => update({ runtimeAvgHours: Number(event.target.value) })}
+                >
+                  {RANGES.map((value) => <option key={value} value={value}>{value}h</option>)}
+                </select>
+                {' '}· {hoursNow === null
                   ? (netDrainW(sample) === null ? '—' : 'solar covering load')
                   : formatDuration(hoursNow)} at current draw
               </span>

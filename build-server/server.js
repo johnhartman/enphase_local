@@ -253,7 +253,6 @@ function recordSample(sample) {
     });
 }
 // ---------------------------------------------------------------- drain
-const AVG_DRAIN_SECONDS = 3600;
 /**
  * What was emptying the battery at one sample, in watts: the measured battery
  * discharge when there is one, else house load minus solar. Mirrors netDrainW
@@ -266,9 +265,9 @@ function sampleDrainW(sample) {
         return null;
     return sample.solarW === null ? sample.loadW : sample.loadW - Math.max(0, sample.solarW);
 }
-/** Mean drain over the last hour, so a short spike does not swing the runtime estimate. */
-function averageDrainW() {
-    const cutoff = Math.round(Date.now() / 1000) - AVG_DRAIN_SECONDS;
+/** Mean drain over the last `seconds`, so a short spike does not swing the runtime estimate. */
+function averageDrainW(seconds) {
+    const cutoff = Math.round(Date.now() / 1000) - seconds;
     let sum = 0;
     let count = 0;
     for (let i = history.length - 1; i >= 0 && history[i].t >= cutoff; i--) {
@@ -503,12 +502,13 @@ function ensureCertificate() {
 const server = https.createServer(ensureCertificate(), (req, res) => {
     const url = new URL(req.url ?? '/', 'https://localhost');
     if (url.pathname === '/api/status') {
+        const avgHours = Math.min(Math.max(Number(url.searchParams.get('avgHours')) || 1, 1), CONFIG.historyHours);
         const respond = () => sendJson(res, 200, {
             ok: !lastError,
             error: lastError,
             sample: latest && forApi(latest),
-            avgDrainW: averageDrainW(),
-            avgDrainSeconds: AVG_DRAIN_SECONDS,
+            avgDrainW: averageDrainW(avgHours * 3600),
+            avgDrainSeconds: avgHours * 3600,
             gatewayHost: activeHost,
             onHotspot: activeHost === CONFIG.fallbackHost,
             sampleSeconds: CONFIG.sampleSeconds,

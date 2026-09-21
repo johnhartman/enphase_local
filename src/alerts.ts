@@ -7,6 +7,7 @@ export const DEFAULT_SETTINGS: AlertSettings = {
   socBelow: 30,
   runtimeBelow: 2,
   onGridLoss: true,
+  runtimeAvgHours: 1,
   sound: false,
 };
 
@@ -71,7 +72,7 @@ export function evaluate(sample: Sample | null, avgDrainW: number | null, settin
       level: 'critical',
       icon: '⏱',
       title: `About ${hours.toFixed(1)}h of battery left`,
-      detail: `Below your ${settings.runtimeBelow}h threshold at the last hour's average draw.`,
+      detail: `Below your ${settings.runtimeBelow}h threshold at the last ${settings.runtimeAvgHours}h average draw.`,
     });
   }
 

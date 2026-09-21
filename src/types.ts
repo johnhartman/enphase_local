@@ -82,5 +82,7 @@ export interface AlertSettings {
   socBelow: number;
   runtimeBelow: number;
   onGridLoss: boolean;
+  /** Hours of history the runtime estimate averages the drain over. */
+  runtimeAvgHours: number;
   sound: boolean;
 }
