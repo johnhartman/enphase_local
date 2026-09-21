@@ -86,7 +86,8 @@ export default function App() {
   }, []);
 
   const sample = status?.sample ?? null;
-  const alerts = useMemo(() => evaluate(sample, settings), [sample, settings]);
+  const avgDrainW = status?.avgDrainW ?? null;
+  const alerts = useMemo(() => evaluate(sample, avgDrainW, settings), [sample, avgDrainW, settings]);
 
   // Fire notifications only on the edge — when an alert first appears.
   useEffect(() => {
@@ -122,8 +123,8 @@ export default function App() {
     { key: 'batt', label: 'Battery', color: COLORS.batt, values: history.map((row) => row.battW) },
   ], [history]);
 
-  const hours = runtimeHours(sample);
-  const drain = netDrainW(sample);
+  const hours = runtimeHours(sample, avgDrainW);
+  const hoursNow = runtimeHours(sample);
   const connectionProblem = Boolean(fetchError) || Boolean(status && !status.ok);
 
   return (
@@ -203,8 +204,13 @@ export default function App() {
             <dt>Runtime</dt>
             <dd>
               {hours === null
-                ? (drain !== null && drain <= 50 ? 'solar covering load' : '—')
+                ? (avgDrainW !== null && avgDrainW <= 50 ? 'solar covering load' : '—')
                 : `${formatDuration(hours)} ${sample?.offGrid ? 'left' : 'if grid dropped'}`}
+              <span className="note">
+                {' '}at the last hour's usage · {hoursNow === null
+                  ? (netDrainW(sample) === null ? '—' : 'solar covering load')
+                  : formatDuration(hoursNow)} at current draw
+              </span>
             </dd>
           </div>
           <div>

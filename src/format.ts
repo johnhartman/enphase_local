@@ -63,9 +63,11 @@ export function netDrainW(sample: Sample | null): number | null {
   return typeof sample.loadW === 'number' ? sample.loadW : null;
 }
 
-/** Hours of battery left at the current net drain, or null when solar covers it. */
-export function runtimeHours(sample: Sample | null): number | null {
-  const drain = netDrainW(sample);
+/**
+ * Hours of battery left at the given drain (the current net drain unless one
+ * is passed), or null when solar covers it.
+ */
+export function runtimeHours(sample: Sample | null, drain: number | null = netDrainW(sample)): number | null {
   if (!sample?.availWh || drain === null || drain <= 50) return null;
   return sample.availWh / drain;
 }

@@ -319,6 +319,33 @@ function recordSample(sample: Sample): void {
   });
 }
 
+// ---------------------------------------------------------------- drain
+
+const AVG_DRAIN_SECONDS = 3600;
+
+/**
+ * What was emptying the battery at one sample, in watts: the measured battery
+ * discharge when there is one, else house load minus solar. Mirrors netDrainW
+ * in src/format.ts.
+ */
+function sampleDrainW(sample: Sample): number | null {
+  if (sample.battW !== null && sample.battW > 5) return sample.battW;
+  if (sample.loadW === null) return null;
+  return sample.solarW === null ? sample.loadW : sample.loadW - Math.max(0, sample.solarW);
+}
+
+/** Mean drain over the last hour, so a short spike does not swing the runtime estimate. */
+function averageDrainW(): number | null {
+  const cutoff = Math.round(Date.now() / 1000) - AVG_DRAIN_SECONDS;
+  let sum = 0;
+  let count = 0;
+  for (let i = history.length - 1; i >= 0 && history[i].t >= cutoff; i--) {
+    const drain = sampleDrainW(history[i]);
+    if (drain !== null) { sum += drain; count++; }
+  }
+  return count ? sum / count : null;
+}
+
 // ---------------------------------------------------------------- outages
 
 // Kept forever, unlike the rolling history. Only the last record can be open
@@ -562,6 +589,8 @@ const server = https.createServer(ensureCertificate(), (req: IncomingMessage, re
       ok: !lastError,
       error: lastError,
       sample: latest && forApi(latest),
+      avgDrainW: averageDrainW(),
+      avgDrainSeconds: AVG_DRAIN_SECONDS,
       gatewayHost: activeHost,
       onHotspot: activeHost === CONFIG.fallbackHost,
       sampleSeconds: CONFIG.sampleSeconds,
