@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import LineChart, { type Series } from './LineChart.js';
 import {
-  formatAgo, formatClock, formatDateTime, formatDuration, formatKwh, formatW, netDrainW, runtimeHours,
+  formatAgo, formatClock, formatDateTime, formatDuration, formatKwh, formatW, runtimeHours,
 } from './format.js';
 import {
   beep, canNotify, DEFAULT_SETTINGS, evaluate, loadSettings, notify, saveSettings,
@@ -124,7 +124,6 @@ export default function App() {
   ], [history]);
 
   const hours = runtimeHours(sample, avgDrainW);
-  const hoursNow = runtimeHours(sample);
   const connectionProblem = Boolean(fetchError) || Boolean(status && !status.ok);
 
   return (
@@ -215,9 +214,6 @@ export default function App() {
                 >
                   {RANGES.map((value) => <option key={value} value={value}>{value}h</option>)}
                 </select>
-                {' '}· {hoursNow === null
-                  ? (netDrainW(sample) === null ? '—' : 'solar covering load')
-                  : formatDuration(hoursNow)} at current draw
               </span>
             </dd>
           </div>
