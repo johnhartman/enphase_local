@@ -389,6 +389,13 @@ const MIME = {
     '.json': 'application/json; charset=utf-8',
     '.ico': 'image/x-icon',
 };
+/**
+ * The production meter reads below zero at times (seen around dusk). The raw
+ * value stays in memory and in history.jsonl; the API reports it as 0 W.
+ */
+function forApi(sample) {
+    return sample.solarW !== null && sample.solarW < 0 ? { ...sample, solarW: 0 } : sample;
+}
 function sendJson(res, status, payload) {
     const body = JSON.stringify(payload);
     res.writeHead(status, {
@@ -471,7 +478,7 @@ const server = https.createServer(ensureCertificate(), (req, res) => {
         const respond = () => sendJson(res, 200, {
             ok: !lastError,
             error: lastError,
-            sample: latest,
+            sample: latest && forApi(latest),
             gatewayHost: activeHost,
             onHotspot: activeHost === CONFIG.fallbackHost,
             sampleSeconds: CONFIG.sampleSeconds,
@@ -489,7 +496,7 @@ const server = https.createServer(ensureCertificate(), (req, res) => {
     if (url.pathname === '/api/history') {
         const hours = Math.min(Number(url.searchParams.get('hours')) || 6, CONFIG.historyHours);
         const cutoff = Math.round(Date.now() / 1000) - hours * 3600;
-        sendJson(res, 200, { hours, samples: history.filter((row) => row.t >= cutoff) });
+        sendJson(res, 200, { hours, samples: history.filter((row) => row.t >= cutoff).map(forApi) });
         return;
     }
     if (url.pathname === '/api/outages') {
