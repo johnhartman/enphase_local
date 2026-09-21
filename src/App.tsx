@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import LineChart, { type Series } from './LineChart.js';
 import {
-  formatAgo, formatClock, formatDuration, formatKwh, formatW, netDrainW, runtimeHours,
+  formatAgo, formatClock, formatDateTime, formatDuration, formatKwh, formatW, netDrainW, runtimeHours,
 } from './format.js';
 import {
   beep, canNotify, DEFAULT_SETTINGS, evaluate, loadSettings, notify, saveSettings,
 } from './alerts.js';
 import type {
-  AlertSettings, HistoryResponse, Sample, StatusResponse,
+  AlertSettings, HistoryResponse, Outage, OutagesResponse, Sample, StatusResponse,
 } from './types.js';
 
 const STATUS_POLL_MS = 8000;
@@ -32,6 +32,7 @@ export default function App() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [history, setHistory] = useState<Sample[]>([]);
+  const [outages, setOutages] = useState<Outage[]>([]);
   const [rangeHours, setRangeHours] = useState<number>(6);
   const [showTable, setShowTable] = useState(false);
   const [settings, setSettings] = useState<AlertSettings>(DEFAULT_SETTINGS);
@@ -70,6 +71,19 @@ export default function App() {
     const timer = window.setInterval(() => { void tick(); }, HISTORY_POLL_MS);
     return () => { cancelled = true; window.clearInterval(timer); };
   }, [rangeHours]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const data = await getJson<OutagesResponse>('/api/outages');
+        if (!cancelled) setOutages(data.outages ?? []);
+      } catch { /* the status banner already reports trouble */ }
+    };
+    void tick();
+    const timer = window.setInterval(() => { void tick(); }, HISTORY_POLL_MS);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, []);
 
   const sample = status?.sample ?? null;
   const alerts = useMemo(() => evaluate(sample, settings), [sample, settings]);
@@ -292,6 +306,46 @@ export default function App() {
         </div>
       )}
 
+      <div className="table-wrap">
+        <table>
+          <caption>Grid outages</caption>
+          <thead>
+            <tr>
+              <th scope="col">Started</th>
+              <th scope="col">Duration</th>
+              <th scope="col">Charge</th>
+              <th scope="col">Lowest</th>
+              <th scope="col">House used</th>
+              <th scope="col">Solar made</th>
+            </tr>
+          </thead>
+          <tbody>
+            {outages.length === 0 && (
+              <tr><td colSpan={6}>No grid outages recorded yet.</td></tr>
+            )}
+            {[...outages].reverse().map((row) => {
+              const until = row.endTime ?? status?.serverTime ?? row.startTime;
+              return (
+                <tr key={row.startTime}>
+                  <td>{formatDateTime(row.startTime)}</td>
+                  <td>
+                    {formatSpan(until - row.startTime)}
+                    {row.endTime === null && ' — ongoing'}
+                  </td>
+                  <td>{formatSoc(row.socStart)} → {row.endTime === null ? '…' : formatSoc(row.socEnd)}</td>
+                  <td>{formatSoc(row.socMin)}</td>
+                  <td>{formatKwh(row.loadWh, 2)}{row.unmeasuredSeconds > 0 && '*'}</td>
+                  <td>{formatKwh(row.solarWh, 2)}{row.unmeasuredSeconds > 0 && '*'}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {outages.some((row) => row.unmeasuredSeconds > 0) && (
+          <p className="note">* Part of this outage had no readings, so the energy totals are incomplete.</p>
+        )}
+      </div>
+
       <details className="settings">
         <summary>Alerts</summary>
         <div className="settings-body">
@@ -354,6 +408,17 @@ export default function App() {
       </footer>
     </div>
   );
+}
+
+const formatSoc = (soc: number | null): string => (soc === null ? '—' : `${soc}%`);
+
+/** Unlike formatDuration, outages can run past two days and need the real length. */
+function formatSpan(seconds: number): string {
+  const minutes = Math.max(0, Math.round(seconds / 60));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ${String(minutes % 60).padStart(2, '0')}m`;
+  return `${Math.floor(hours / 24)}d ${hours % 24}h`;
 }
 
 interface TileProps {

@@ -115,6 +115,8 @@ router dies mid-outage.
 | `TLS_KEY` | `key.pem` | Private key for `TLS_CERT` (minted if missing) |
 | `SAMPLE_SECONDS` | `30` | Poll interval |
 | `HISTORY_HOURS` | `48` | History retention |
+| `HISTORY_FILE` | `history.jsonl` | Rolling sample history |
+| `OUTAGES_FILE` | `outages.jsonl` | Grid outage log |
 | `GATEWAY_SERIAL` | `482513006020` | Used in renewal URLs |
 
 ## Rebuilding after changes
@@ -132,6 +134,10 @@ running server).
 
 - `.enphase_token` — current gateway token (auto-updated when refresh is on)
 - `history.jsonl` — rolling sample history
+- `outages.jsonl` — one line per grid outage (start, end, battery charge at
+  start/lowest/end, house and solar Wh while islanded); kept forever and shown
+  under "Grid outages" on the dashboard. Start and end also go to the log as
+  `[outage]` lines.
 - `.enphase_credentials.json` — only if you created it; never written by the server
 
 ## Notes

@@ -33,9 +33,13 @@ run as an unattended appliance.
 - `server/token.ts` — TokenManager: monthly token re-mint using Enlighten
   credentials from `.enphase_credentials.json` (optional, chmod 600, not in
   git). Does NOT support Enphase accounts with MFA.
-- API: `GET /api/status` (live sample + token status), `GET /api/history?hours=N`.
+- API: `GET /api/status` (live sample + token status), `GET /api/history?hours=N`,
+  `GET /api/outages`.
+- Grid outages (spans of `offGrid` samples) are logged to `outages.jsonl` —
+  never pruned, rewritten atomically on every sample while an outage is open
+  so it survives a restart. `[outage]` lines in `monitor.log` mark start/end.
 - Secrets/state never in git: `.enphase_token`, `.enphase_credentials.json`,
-  `history.jsonl`, `*.log`, `cert.pem`, `key.pem` (see .gitignore).
+  `history.jsonl`, `outages.jsonl`, `*.log`, `cert.pem`, `key.pem` (see .gitignore).
 
 ## Commands
 

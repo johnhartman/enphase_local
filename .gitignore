@@ -2,6 +2,8 @@ node_modules/
 .enphase_token
 .enphase_credentials.json
 history.jsonl
+outages.jsonl
+outages.jsonl.tmp
 *.log
 cert.pem
 key.pem

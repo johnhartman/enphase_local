@@ -22,6 +22,17 @@ export function formatClock(epochSeconds: Maybe): string {
   });
 }
 
+export function formatDateTime(epochSeconds: Maybe): string {
+  if (!epochSeconds) return '—';
+  return new Date(epochSeconds * 1000).toLocaleString([], {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 export function formatAgo(epochSeconds: Maybe, now: number = Date.now() / 1000): string {
   if (!epochSeconds) return 'never';
   const seconds = Math.max(0, Math.round(now - epochSeconds));

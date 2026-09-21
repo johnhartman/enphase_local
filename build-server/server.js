@@ -35,6 +35,7 @@ const CONFIG = {
     sampleSeconds: Number(process.env.SAMPLE_SECONDS || 30),
     historyHours: Number(process.env.HISTORY_HOURS || 48),
     historyFile: process.env.HISTORY_FILE || path.join(ROOT, 'history.jsonl'),
+    outagesFile: process.env.OUTAGES_FILE || path.join(ROOT, 'outages.jsonl'),
     requestTimeoutMs: 20000,
     serial: process.env.GATEWAY_SERIAL || '482513006020',
 };
@@ -244,11 +245,100 @@ function rewriteHistory() {
     });
 }
 function recordSample(sample) {
+    trackOutage(history[history.length - 1] ?? null, sample);
     history.push(sample);
     fs.appendFile(CONFIG.historyFile, JSON.stringify(sample) + '\n', (err) => {
         if (err)
             console.error('[history] append failed:', err.message);
     });
+}
+// ---------------------------------------------------------------- outages
+// Kept forever, unlike the rolling history. Only the last record can be open
+// (endTime null); it is updated on every sample while the grid is down, so an
+// outage survives a restart of this process.
+let outages = [];
+function loadOutages() {
+    try {
+        for (const line of fs.readFileSync(CONFIG.outagesFile, 'utf8').split('\n')) {
+            if (!line.trim())
+                continue;
+            try {
+                const row = JSON.parse(line);
+                if (typeof row.startTime === 'number')
+                    outages.push(row);
+            }
+            catch { /* skip a torn line */ }
+        }
+        console.log(`[outage] loaded ${outages.length} outages from ${path.basename(CONFIG.outagesFile)}`);
+    }
+    catch {
+        console.log('[outage] starting a new outage log');
+    }
+}
+/** Write to a temp file and rename, so a power cut can't tear the log. */
+function saveOutages() {
+    const body = outages.map((row) => JSON.stringify(row)).join('\n');
+    const tempFile = `${CONFIG.outagesFile}.tmp`;
+    try {
+        fs.writeFileSync(tempFile, body ? body + '\n' : '');
+        fs.renameSync(tempFile, CONFIG.outagesFile);
+    }
+    catch (err) {
+        console.error('[outage] save failed:', err.message);
+    }
+}
+const formatSpan = (seconds) => {
+    const minutes = Math.round(seconds / 60);
+    return minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`;
+};
+const formatSoc = (soc) => (soc === null ? '—' : `${soc}%`);
+function trackOutage(previous, sample) {
+    const last = outages[outages.length - 1];
+    const open = last && last.endTime === null ? last : null;
+    if (!open) {
+        if (!sample.offGrid)
+            return;
+        outages.push({
+            startTime: sample.t,
+            endTime: null,
+            socStart: sample.soc,
+            socMin: sample.soc,
+            socEnd: null,
+            loadWh: 0,
+            solarWh: 0,
+            unmeasuredSeconds: 0,
+        });
+        console.log(`[outage] grid down at ${new Date(sample.t * 1000).toISOString()}, battery ${formatSoc(sample.soc)}`);
+        saveOutages();
+        return;
+    }
+    if (sample.soc !== null) {
+        open.socMin = open.socMin === null ? sample.soc : Math.min(open.socMin, sample.soc);
+    }
+    // Energy is integrated between consecutive samples of the outage; a longer
+    // gap (failed polls, this process down) or a missing reading is unmeasured.
+    const seconds = previous && previous.t >= open.startTime ? sample.t - previous.t : 0;
+    if (previous && seconds > 0) {
+        if (seconds <= CONFIG.sampleSeconds * 5
+            && previous.loadW !== null && sample.loadW !== null
+            && previous.solarW !== null && sample.solarW !== null) {
+            // The production meter reads slightly negative at times; that is not
+            // production, so it is floored at zero.
+            open.loadWh += ((previous.loadW + sample.loadW) / 2) * (seconds / 3600);
+            open.solarWh += ((Math.max(0, previous.solarW) + Math.max(0, sample.solarW)) / 2) * (seconds / 3600);
+        }
+        else {
+            open.unmeasuredSeconds += seconds;
+        }
+    }
+    if (!sample.offGrid) {
+        open.endTime = sample.t;
+        open.socEnd = sample.soc;
+        console.log(`[outage] grid restored after ${formatSpan(open.endTime - open.startTime)} — battery `
+            + `${formatSoc(open.socStart)} → ${formatSoc(open.socEnd)} (low ${formatSoc(open.socMin)}), `
+            + `house used ${(open.loadWh / 1000).toFixed(2)} kWh, solar made ${(open.solarWh / 1000).toFixed(2)} kWh`);
+    }
+    saveOutages();
 }
 // While the gateway is down, each poll blocks for the full timeout on both
 // hosts, and every dashboard refresh would otherwise queue another one. Share
@@ -402,6 +492,10 @@ const server = https.createServer(ensureCertificate(), (req, res) => {
         sendJson(res, 200, { hours, samples: history.filter((row) => row.t >= cutoff) });
         return;
     }
+    if (url.pathname === '/api/outages') {
+        sendJson(res, 200, { outages });
+        return;
+    }
     serveStatic(res, url.pathname);
 });
 function lanAddresses() {
@@ -415,6 +509,7 @@ function lanAddresses() {
     return out;
 }
 loadHistory();
+loadOutages();
 void poll();
 void tokens.refresh(); // monthly refresh, first checked at startup
 const portSuffix = CONFIG.port === 443 ? '' : `:${CONFIG.port}`;

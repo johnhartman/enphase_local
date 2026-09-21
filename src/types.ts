@@ -44,6 +44,27 @@ export interface HistoryResponse {
   samples: Sample[];
 }
 
+/** One grid outage: the stretch during which the system stayed islanded. */
+export interface Outage {
+  /** Unix seconds of the first off-grid sample. */
+  startTime: number;
+  /** Unix seconds of the first on-grid sample after it; null while ongoing. */
+  endTime: number | null;
+  socStart: number | null;
+  socMin: number | null;
+  socEnd: number | null;
+  /** House consumption while islanded, watt-hours. */
+  loadWh: number;
+  /** Solar production while islanded, watt-hours. */
+  solarWh: number;
+  /** Seconds of the outage with no usable readings, left out of the Wh totals. */
+  unmeasuredSeconds: number;
+}
+
+export interface OutagesResponse {
+  outages: Outage[];
+}
+
 export type AlertLevel = 'critical' | 'warning';
 
 export interface Alert {
