@@ -203,6 +203,7 @@ body {
 
 .hero-meta dd { margin: 1px 0 0; font-size: 14px; font-weight: 600; }
 .hero-meta .note { font-weight: 400; color: var(--text-muted); font-size: 12px; }
+.hero-meta .runtime-note { font-weight: 600; }
 .hero-meta select { font: inherit; color: inherit; background: var(--page); border: 1px solid var(--border); border-radius: 6px; }
 
 /* ---------- tiles ---------- */

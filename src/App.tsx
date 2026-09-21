@@ -206,7 +206,7 @@ export default function App() {
               {hours === null
                 ? (avgDrainW !== null && avgDrainW <= 50 ? 'solar covering load' : '—')
                 : `${formatDuration(hours)} ${sample?.offGrid ? 'left' : 'if grid dropped'}`}
-              <span className="note">
+              <span className="note runtime-note">
                 {' '}averaged over{' '}
                 <select
                   aria-label="Runtime averaging window"
