@@ -33,9 +33,8 @@ export interface StatusResponse {
   ok: boolean;
   error: GatewayError | null;
   sample: Sample | null;
-  /** Mean net battery drain over the last avgDrainSeconds, watts. */
-  avgDrainW: number | null;
-  avgDrainSeconds: number;
+  /** Mean net battery drain in watts, keyed by averaging window in hours (1, 6, 24, 48). */
+  avgDrainW: Record<number, number | null>;
   gatewayHost: string;
   onHotspot: boolean;
   sampleSeconds: number;

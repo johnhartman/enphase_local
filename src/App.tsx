@@ -48,7 +48,7 @@ export default function App() {
     let cancelled = false;
     const tick = async () => {
       try {
-        const data = await getJson<StatusResponse>(`/api/status?avgHours=${settings.runtimeAvgHours}`);
+        const data = await getJson<StatusResponse>('/api/status');
         if (!cancelled) { setStatus(data); setFetchError(null); }
       } catch (err) {
         if (!cancelled) setFetchError(err instanceof Error ? err.message : String(err));
@@ -57,7 +57,7 @@ export default function App() {
     void tick();
     const timer = window.setInterval(() => { void tick(); }, STATUS_POLL_MS);
     return () => { cancelled = true; window.clearInterval(timer); };
-  }, [settings.runtimeAvgHours]);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,7 +86,7 @@ export default function App() {
   }, []);
 
   const sample = status?.sample ?? null;
-  const avgDrainW = status?.avgDrainW ?? null;
+  const avgDrainW = status?.avgDrainW?.[settings.runtimeAvgHours] ?? null;
   const alerts = useMemo(() => evaluate(sample, avgDrainW, settings), [sample, avgDrainW, settings]);
 
   // Fire notifications only on the edge — when an alert first appears.
