@@ -6,7 +6,7 @@ import {
 import {
   beep, canNotify, DEFAULT_SETTINGS, evaluate, loadSettings, notify, saveSettings,
 } from './alerts.js';
-import { applyTheme, loadTheme, saveTheme, systemTheme, watchSystemTheme, type Theme } from './theme.js';
+import { applyTheme, loadTheme, saveTheme, THEMES, type Theme } from './theme.js';
 import type {
   AlertSettings, HistoryResponse, Outage, OutagesResponse, Sample, StatusResponse,
 } from './types.js';
@@ -38,7 +38,7 @@ export default function App() {
   const [showTable, setShowTable] = useState(false);
   const [settings, setSettings] = useState<AlertSettings>(DEFAULT_SETTINGS);
   const [notifState, setNotifState] = useState<NotificationPermission>('default');
-  const [theme, setTheme] = useState<Theme>(() => loadTheme() ?? systemTheme());
+  const [theme, setTheme] = useState<Theme>(loadTheme);
   const seenAlerts = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -46,11 +46,7 @@ export default function App() {
     if (canNotify()) setNotifState(Notification.permission);
   }, []);
 
-  // Until the user picks a theme, the switch tracks the system setting.
-  useEffect(() => watchSystemTheme((next) => { if (!loadTheme()) setTheme(next); }), []);
-
-  const toggleTheme = () => {
-    const next: Theme = theme === 'dark' ? 'light' : 'dark';
+  const chooseTheme = (next: Theme) => {
     setTheme(next);
     saveTheme(next);
     applyTheme(next);
@@ -155,18 +151,20 @@ export default function App() {
               ? 'no data'
               : `updated ${formatAgo(sample?.t, status?.serverTime ?? Date.now() / 1000)}`}
           </div>
-          <button
-            type="button"
-            className="theme-toggle"
-            role="switch"
-            aria-checked={theme === 'dark'}
-            aria-label="Dark mode"
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            onClick={toggleTheme}
-          >
-            <span aria-hidden="true">{theme === 'dark' ? '☾' : '☀'}</span>
-            {theme === 'dark' ? 'Dark' : 'Light'}
-          </button>
+          <div className="range theme-modes" role="radiogroup" aria-label="Appearance">
+            {THEMES.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={theme === value}
+                className={theme === value ? 'active' : ''}
+                onClick={() => chooseTheme(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 

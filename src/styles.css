@@ -82,33 +82,21 @@ body {
 
 .topbar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
 }
 
 .topbar-right {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-shrink: 0;
+  margin-left: auto;
 }
 
-.theme-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 5px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface-1);
-  color: var(--text-secondary);
-  cursor: pointer;
-  white-space: nowrap;
-}
+/* Appearance picker: same pills as the range control, a little tighter. */
+.theme-modes button { padding: 4px 9px; }
 
 .topbar h1 { margin: 0; font-size: 20px; letter-spacing: -0.01em; }
 
