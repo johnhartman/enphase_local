@@ -6,6 +6,7 @@ import {
 import {
   beep, canNotify, DEFAULT_SETTINGS, evaluate, loadSettings, notify, saveSettings,
 } from './alerts.js';
+import { applyTheme, loadTheme, saveTheme, systemTheme, watchSystemTheme, type Theme } from './theme.js';
 import type {
   AlertSettings, HistoryResponse, Outage, OutagesResponse, Sample, StatusResponse,
 } from './types.js';
@@ -37,12 +38,23 @@ export default function App() {
   const [showTable, setShowTable] = useState(false);
   const [settings, setSettings] = useState<AlertSettings>(DEFAULT_SETTINGS);
   const [notifState, setNotifState] = useState<NotificationPermission>('default');
+  const [theme, setTheme] = useState<Theme>(() => loadTheme() ?? systemTheme());
   const seenAlerts = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     setSettings(loadSettings());
     if (canNotify()) setNotifState(Notification.permission);
   }, []);
+
+  // Until the user picks a theme, the switch tracks the system setting.
+  useEffect(() => watchSystemTheme((next) => { if (!loadTheme()) setTheme(next); }), []);
+
+  const toggleTheme = () => {
+    const next: Theme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    saveTheme(next);
+    applyTheme(next);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -136,11 +148,25 @@ export default function App() {
             {status?.onHotspot && <span className="chip">hotspot</span>}
           </p>
         </div>
-        <div className={`conn ${connectionProblem ? 'bad' : 'good'}`}>
-          <span className="dot" aria-hidden="true" />
-          {connectionProblem
-            ? 'no data'
-            : `updated ${formatAgo(sample?.t, status?.serverTime ?? Date.now() / 1000)}`}
+        <div className="topbar-right">
+          <div className={`conn ${connectionProblem ? 'bad' : 'good'}`}>
+            <span className="dot" aria-hidden="true" />
+            {connectionProblem
+              ? 'no data'
+              : `updated ${formatAgo(sample?.t, status?.serverTime ?? Date.now() / 1000)}`}
+          </div>
+          <button
+            type="button"
+            className="theme-toggle"
+            role="switch"
+            aria-checked={theme === 'dark'}
+            aria-label="Dark mode"
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            onClick={toggleTheme}
+          >
+            <span aria-hidden="true">{theme === 'dark' ? '☾' : '☀'}</span>
+            {theme === 'dark' ? 'Dark' : 'Light'}
+          </button>
         </div>
       </header>
 
