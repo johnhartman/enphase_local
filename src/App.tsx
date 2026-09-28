@@ -140,14 +140,16 @@ export default function App() {
     key: 'soc',
     label: 'Charge',
     color: COLORS.batt,
+    fill: true,
     values: history.map((row) => row.soc),
   }], [history]);
   const powerSeries = useMemo<Series[]>(() => [
     { key: 'solar', label: 'Solar', color: COLORS.solar, values: history.map((row) => row.solarW) },
     { key: 'load', label: 'House', color: COLORS.load, values: history.map((row) => row.loadW) },
-    // Dashed: while islanded the battery carries the whole house, so this
-    // line sits exactly on the house line and would otherwise hide it.
-    { key: 'batt', label: 'Battery', color: COLORS.batt, dashed: true, values: history.map((row) => row.battW) },
+    // Shaded and drawn beneath: while islanded the battery carries the whole
+    // house, so this line sits exactly on the house line, which then reads
+    // as the house line riding the edge of the battery's field.
+    { key: 'batt', label: 'Battery', color: COLORS.batt, fill: true, values: history.map((row) => row.battW) },
   ], [history]);
 
   const hours = runtimeHours(sample, avgDrainW, socDrop, whPerPoint);
@@ -327,7 +329,6 @@ export default function App() {
         domainY={[0, 100]}
         formatY={(value) => `${Math.round(value)}%`}
         formatTooltip={(value) => (value === null ? '—' : `${Math.round(value)}%`)}
-        area
         legend={false}
       />
 

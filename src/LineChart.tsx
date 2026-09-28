@@ -7,8 +7,12 @@ export interface Series {
   label: string;
   color: string;
   values: (number | null)[];
-  /** Dashed stroke, so a line that coincides with another still shows both. */
-  dashed?: boolean;
+  /**
+   * Also shade between the line and zero, and draw the line beneath any
+   * unfilled series, so a line that coincides with it still shows on top
+   * of the shaded field.
+   */
+  fill?: boolean;
 }
 
 interface LineChartProps {
@@ -20,7 +24,6 @@ interface LineChartProps {
   formatY: (value: number) => string;
   formatTooltip?: (value: number | null) => string;
   height?: number;
-  area?: boolean;
   legend?: boolean;
   emptyLabel?: string;
 }
@@ -115,7 +118,6 @@ export default function LineChart({
   formatY,
   formatTooltip,
   height = 190,
-  area = false,
   legend = true,
   emptyLabel = 'Collecting data…',
 }: LineChartProps) {
@@ -169,20 +171,32 @@ export default function LineChart({
   }, [xTicks]);
 
   const paths = useMemo(() => series.map((line) => {
+    // The line, and for filled series one closed polygon per unbroken run of
+    // readings down to the zero line (gaps stay open in both).
+    const zeroY = Math.min(Math.max(scaleY(0), PAD.top), height - PAD.bottom);
     let d = '';
-    let penDown = false;
+    let fillD = '';
+    let run: string[] = [];
+    const closeRun = () => {
+      if (run.length > 0) {
+        const first = run[0];
+        const last = run[run.length - 1];
+        fillD += `M${first} ${zeroY.toFixed(1)}L${run.join('L')}L${last.split(' ')[0]} ${zeroY.toFixed(1)}Z`;
+      }
+      run = [];
+    };
     line.values.forEach((value, index) => {
       if (value === null || Number.isNaN(value)) {
-        penDown = false;
+        closeRun();
         return;
       }
-      const x = scaleX(times[index]);
-      const y = scaleY(value);
-      d += `${penDown ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`;
-      penDown = true;
+      const point = `${scaleX(times[index]).toFixed(1)} ${scaleY(value).toFixed(1)}`;
+      d += `${run.length > 0 ? 'L' : 'M'}${point}`;
+      run.push(point);
     });
-    return { ...line, d };
-  }), [series, times, scaleX, scaleY]);
+    closeRun();
+    return { ...line, d, fillD: line.fill ? fillD : '' };
+  }), [series, times, scaleX, scaleY, height]);
 
   const endLabels = useMemo(() => {
     const entries: EndLabel[] = [];
@@ -208,8 +222,6 @@ export default function LineChart({
 
   const summary = `${title}: ${series.map((line) => line.label).join(', ')}`;
   const hasData = times.length >= 2;
-  const lastX = hasData ? scaleX(times[times.length - 1]) : 0;
-  const firstX = hasData ? scaleX(times[0]) : 0;
   const baseline = height - PAD.bottom;
 
   return (
@@ -286,22 +298,17 @@ export default function LineChart({
 
             <line className="axis" x1={PAD.left} x2={PAD.left + innerWidth} y1={baseline} y2={baseline} />
 
-            {area && paths.length === 1 && paths[0].d && (
-              <path
-                d={`${paths[0].d}L${lastX.toFixed(1)} ${baseline.toFixed(1)}L${firstX.toFixed(1)} ${baseline.toFixed(1)}Z`}
-                fill={paths[0].color}
-                opacity="0.12"
-              />
-            )}
+            {paths.filter((line) => line.fillD).map((line) => (
+              <path key={`${line.key}-fill`} d={line.fillD} fill={line.color} opacity="0.14" />
+            ))}
 
-            {paths.map((line) => (
+            {[...paths.filter((line) => line.fill), ...paths.filter((line) => !line.fill)].map((line) => (
               <path
                 key={line.key}
                 d={line.d}
                 fill="none"
                 stroke={line.color}
                 strokeWidth="2"
-                strokeDasharray={line.dashed ? '6 5' : undefined}
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
