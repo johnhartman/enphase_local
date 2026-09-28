@@ -36,6 +36,7 @@ export function evaluate(
   avgDrainW: number | null,
   settings: AlertSettings,
   socDropPerHour: number | null = null,
+  whPerSocPoint: number | null = null,
 ): Alert[] {
   if (!sample) return [];
   const active: Alert[] = [];
@@ -70,7 +71,7 @@ export function evaluate(
     });
   }
 
-  const hours = runtimeHours(sample, avgDrainW, socDropPerHour);
+  const hours = runtimeHours(sample, avgDrainW, socDropPerHour, whPerSocPoint);
   if (hours !== null && hours < settings.runtimeBelow) {
     active.push({
       id: 'runtime',

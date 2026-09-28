@@ -75,11 +75,18 @@ export function runtimeHours(
   sample: Sample | null,
   drain: number | null = netDrainW(sample),
   socDropPerHour: number | null = null,
+  whPerSocPoint: number | null = null,
 ): number | null {
   if (!sample) return null;
   if (sample.offGrid && socDropPerHour !== null && socDropPerHour > 0 && sample.soc !== null) {
     return sample.soc / socDropPerHour;
   }
-  if (!sample.availWh || drain === null || drain <= 50) return null;
-  return sample.availWh / drain;
+  if (drain === null || drain <= 50) return null;
+  // Energy actually deliverable: the learned Wh per SOC point when a past
+  // outage has taught us one, else the gateway's nominal available Wh.
+  const wh = whPerSocPoint !== null && whPerSocPoint > 0 && sample.soc !== null
+    ? sample.soc * whPerSocPoint
+    : sample.availWh;
+  if (!wh) return null;
+  return wh / drain;
 }

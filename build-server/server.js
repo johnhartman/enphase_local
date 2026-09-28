@@ -372,6 +372,37 @@ function socDropPerHour() {
     }
     return out;
 }
+/**
+ * AC watt-hours the batteries actually delivered per point of state of
+ * charge, learned from closed outage records. The gateway's available Wh is
+ * SOC × nominal capacity, but in the 2026-09-28 outage 28 points yielded
+ * about 2.1 kWh, roughly 75 Wh per point rather than 100, so an estimate
+ * built on the nominal figure runs about a third long. Outages with a small
+ * SOC drop (quantised to whole points) or with more than a fifth of their
+ * time unmeasured are skipped; the measured energy of the rest is scaled up
+ * for their unmeasured seconds. Pooled across outages, weighted by SOC drop.
+ */
+function learnedWhPerSocPoint() {
+    let wh = 0;
+    let points = 0;
+    let used = 0;
+    for (const outage of outages) {
+        if (outage.endTime === null || outage.socStart === null || outage.socEnd === null)
+            continue;
+        const drop = outage.socStart - outage.socEnd;
+        const seconds = outage.endTime - outage.startTime;
+        const measured = seconds - outage.unmeasuredSeconds;
+        if (drop < 5 || seconds <= 0 || measured / seconds < 0.8)
+            continue;
+        const net = (outage.loadWh - outage.solarWh) * (seconds / measured);
+        if (net <= 0)
+            continue;
+        wh += net;
+        points += drop;
+        used++;
+    }
+    return { whPerSocPoint: points > 0 ? wh / points : null, calibrationOutages: used };
+}
 // ---------------------------------------------------------------- outages
 // Kept forever, unlike the rolling history. Only the last record can be open
 // (endTime null); it is updated on every sample while the grid is down, so an
@@ -602,6 +633,7 @@ const server = https.createServer(ensureCertificate(), (req, res) => {
             sample: latest && forApi(latest),
             avgDrainW: averageDrainW(),
             socDropPerHour: socDropPerHour(),
+            ...learnedWhPerSocPoint(),
             gatewayHost: activeHost,
             onHotspot: activeHost === CONFIG.fallbackHost,
             sampleSeconds: CONFIG.sampleSeconds,

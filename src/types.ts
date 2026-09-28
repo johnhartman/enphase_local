@@ -42,6 +42,13 @@ export interface StatusResponse {
    * first 10 minutes. Preferred for the runtime estimate when present.
    */
   socDropPerHour: Record<number, number | null>;
+  /**
+   * AC Wh the batteries delivered per SOC point, learned from closed outages
+   * (null until one qualifies). The on-grid runtime estimate uses it in
+   * place of the gateway's nominal available Wh.
+   */
+  whPerSocPoint: number | null;
+  calibrationOutages: number;
   gatewayHost: string;
   onHotspot: boolean;
   sampleSeconds: number;

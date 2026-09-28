@@ -12,7 +12,9 @@ run as an unattended appliance.
   the gateway's own Wi-Fi (`Envoy_XXXXXX`): `172.30.1.1`.
 - 2× IQ Battery 5P ≈ 10 kWh, reserve set to 100% (full-backup mode — the
   batteries idle at 100% and only discharge when islanded; "0 operating" on
-  the gateway UI is normal).
+  the gateway UI is normal). Measured 2026-09-28: they deliver ≈ 75 Wh of AC
+  per SOC point, not the nominal 100 — the server re-learns this from every
+  closed outage record and the on-grid runtime estimate uses it.
 - Gateway auth: owner JWT bearer token, valid 1 year, self-signed TLS
   (`rejectUnauthorized: false` is intentional). Renewal URL:
   `https://enlighten.enphaseenergy.com/entrez-auth-token?serial_num=482513006020`

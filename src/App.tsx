@@ -107,9 +107,11 @@ export default function App() {
   const sample = status?.sample ?? null;
   const avgDrainW = status?.avgDrainW?.[settings.runtimeAvgHours] ?? null;
   const socDrop = status?.socDropPerHour?.[settings.runtimeAvgHours] ?? null;
+  const whPerPoint = status?.whPerSocPoint ?? null;
+  const calibrationOutages = status?.calibrationOutages ?? 0;
   const alerts = useMemo(
-    () => evaluate(sample, avgDrainW, settings, socDrop),
-    [sample, avgDrainW, settings, socDrop],
+    () => evaluate(sample, avgDrainW, settings, socDrop, whPerPoint),
+    [sample, avgDrainW, settings, socDrop, whPerPoint],
   );
 
   // Fire notifications only on the edge — when an alert first appears.
@@ -148,7 +150,7 @@ export default function App() {
     { key: 'batt', label: 'Battery', color: COLORS.batt, dashed: true, values: history.map((row) => row.battW) },
   ], [history]);
 
-  const hours = runtimeHours(sample, avgDrainW, socDrop);
+  const hours = runtimeHours(sample, avgDrainW, socDrop, whPerPoint);
   const fromSocDrop = Boolean(sample?.offGrid && socDrop !== null && socDrop > 0);
   const connectionProblem = Boolean(fetchError) || Boolean(status && !status.ok);
   // The server's clock at the last response, advanced by the time since.
@@ -258,6 +260,9 @@ export default function App() {
                 >
                   {RANGES.map((value) => <option key={value} value={value}>{value}h</option>)}
                 </select>
+                {!fromSocDrop && whPerPoint !== null && (
+                  <> · calibrated from {calibrationOutages} outage{calibrationOutages === 1 ? '' : 's'}</>
+                )}
               </span>
             </dd>
           </div>
