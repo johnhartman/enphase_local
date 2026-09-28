@@ -76,7 +76,7 @@ run as an unattended appliance.
   `battW > 0` really is discharging.
 - Auto-refresh: verified — `/api/status` on 2026-09-28 showed lastRefresh ok
   on 2026-09-22, "new token valid until 2027-09-22".
-- Grid restore: verified 2026-09-28 at 08:30 EDT — `mains_oper_state` went
+- Grid restore: verified 2026-09-28 at 05:50 EDT — `mains_oper_state` went
   back to "closed", the dashboard flipped to "on grid", and the outage record
   closed itself (4 h 16 m, 100 % → 72 %, 1.97 kWh). Both states are captured
   under `docs/gateway-captures/` and replay with `test/replay.sh`.
