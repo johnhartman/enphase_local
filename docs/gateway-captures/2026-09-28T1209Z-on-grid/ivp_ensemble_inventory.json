@@ -1,0 +1,100 @@
+[
+    {
+        "type": "ENCHARGE",
+        "devices": [
+            {
+                "part_num": "836-01828-r09",
+                "serial_num": "492449007895",
+                "installed": 1790580085,
+                "device_status": [
+                    "envoy.global.ok",
+                    "prop.done"
+                ],
+                "last_rpt_date": 1790597331,
+                "admin_state": 6,
+                "admin_state_str": "ENCHG_STATE_READY",
+                "created_date": 1790580085,
+                "img_load_date": 1790580085,
+                "img_pnum_running": "3.0.9001_rel/31.50",
+                "bmu_fw_version": "3.8.78",
+                "bmu_ibl_fw_version": "",
+                "communicating": true,
+                "sleep_enabled": false,
+                "percentFull": 82,
+                "temperature": 23,
+                "maxCellTemp": 24,
+                "reported_enc_grid_state": "grid-tied",
+                "comm_level_sub_ghz": 0,
+                "comm_level_2_4_ghz": 0,
+                "led_status": 12,
+                "dc_switch_off": false,
+                "encharge_rev": 3,
+                "encharge_capacity": 5000,
+                "phase": "ph-a",
+                "der_index": 2
+            },
+            {
+                "part_num": "836-01828-r12",
+                "serial_num": "492533014522",
+                "installed": 1790580085,
+                "device_status": [
+                    "envoy.global.ok",
+                    "prop.done"
+                ],
+                "last_rpt_date": 1790597343,
+                "admin_state": 6,
+                "admin_state_str": "ENCHG_STATE_READY",
+                "created_date": 1790580085,
+                "img_load_date": 1790580085,
+                "img_pnum_running": "3.0.9001_rel/31.50",
+                "bmu_fw_version": "3.8.78",
+                "bmu_ibl_fw_version": "",
+                "communicating": true,
+                "sleep_enabled": false,
+                "percentFull": 81,
+                "temperature": 23,
+                "maxCellTemp": 24,
+                "reported_enc_grid_state": "grid-tied",
+                "comm_level_sub_ghz": 0,
+                "comm_level_2_4_ghz": 0,
+                "led_status": 12,
+                "dc_switch_off": false,
+                "encharge_rev": 3,
+                "encharge_capacity": 5000,
+                "phase": "ph-a",
+                "der_index": 2
+            }
+        ]
+    },
+    {
+        "type": "ENPOWER",
+        "isMidDevice": true,
+        "devices": [
+            {
+                "part_num": "865-00378-r44",
+                "serial_num": "482524024519",
+                "installed": 1790580082,
+                "device_status": [
+                    "envoy.global.ok",
+                    "prop.done"
+                ],
+                "last_rpt_date": 1790597372,
+                "admin_state": 24,
+                "admin_state_str": "ENPWR_STATE_OPER_CLOSED",
+                "created_date": 1790580082,
+                "img_load_date": 1790580082,
+                "img_pnum_running": "3.0.7296_rel/31.50",
+                "communicating": true,
+                "temperature": 67,
+                "comm_level_sub_ghz": 0,
+                "comm_level_2_4_ghz": 0,
+                "mains_admin_state": "closed",
+                "mains_oper_state": "closed",
+                "Enpwr_grid_mode": "multimode-ongrid",
+                "Enchg_grid_mode": "multimode-ongrid",
+                "Enpwr_relay_state_bm": 508,
+                "Enpwr_curr_state_id": 16
+            }
+        ]
+    }
+]
