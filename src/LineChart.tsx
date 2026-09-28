@@ -13,6 +13,8 @@ export interface Series {
   beneath?: boolean;
   /** Tooltip text for this series, in place of the chart's formatTooltip. */
   format?: (value: number | null) => string;
+  /** Shorter name for the label at the line's end, where the space is tight. */
+  endLabel?: string;
 }
 
 interface LineChartProps {
@@ -204,7 +206,7 @@ export default function LineChart({
       for (let i = line.values.length - 1; i >= 0; i -= 1) {
         const value = line.values[i];
         if (value === null || Number.isNaN(value)) continue;
-        entries.push({ key: line.key, label: line.label, color: line.color, y: scaleY(value) });
+        entries.push({ key: line.key, label: line.endLabel ?? line.label, color: line.color, y: scaleY(value) });
         break;
       }
     });

@@ -153,6 +153,7 @@ export default function App() {
     {
       key: 'batt',
       label: 'Battery (+ charging)',
+      endLabel: 'Battery',
       color: COLORS.batt,
       values: history.map((row) => (row.battW === null ? null : -row.battW)),
       format: (value) => (value === null
