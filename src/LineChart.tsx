@@ -179,9 +179,9 @@ export default function LineChart({
     let run: string[] = [];
     const closeRun = () => {
       if (run.length > 0) {
-        const first = run[0];
-        const last = run[run.length - 1];
-        fillD += `M${first} ${zeroY.toFixed(1)}L${run.join('L')}L${last.split(' ')[0]} ${zeroY.toFixed(1)}Z`;
+        const firstX = run[0].split(' ')[0];
+        const lastX = run[run.length - 1].split(' ')[0];
+        fillD += `M${firstX} ${zeroY.toFixed(1)}L${run.join('L')}L${lastX} ${zeroY.toFixed(1)}Z`;
       }
       run = [];
     };
