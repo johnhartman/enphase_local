@@ -146,9 +146,19 @@ export default function App() {
   const powerSeries = useMemo<Series[]>(() => [
     { key: 'solar', label: 'Solar', color: COLORS.solar, values: history.map((row) => row.solarW) },
     { key: 'load', label: 'House', color: COLORS.load, values: history.map((row) => row.loadW) },
-    // Drawn beneath the house line: while islanded the battery carries the
-    // whole house, so the two coincide and the house line is the one shown.
-    { key: 'batt', label: 'Battery', color: COLORS.batt, beneath: true, values: history.map((row) => row.battW) },
+    // Plotted charging-positive, the opposite of the stored value, so it is
+    // a load-side quantity like the house: while islanded the battery line
+    // mirrors the house line below zero instead of lying on top of it, and
+    // house + battery charging = solar + grid import holds sign for sign.
+    {
+      key: 'batt',
+      label: 'Battery (+ charging)',
+      color: COLORS.batt,
+      values: history.map((row) => (row.battW === null ? null : -row.battW)),
+      format: (value) => (value === null
+        ? '—'
+        : `${formatW(Math.abs(value))} ${value > 5 ? 'charging' : value < -5 ? 'discharging' : 'idle'}`),
+    },
   ], [history]);
 
   const hours = runtimeHours(sample, avgDrainW, socDrop, whPerPoint);

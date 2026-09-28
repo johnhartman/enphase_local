@@ -11,6 +11,8 @@ export interface Series {
   fill?: boolean;
   /** Draw before the other lines, so a series that coincides with it stays visible. */
   beneath?: boolean;
+  /** Tooltip text for this series, in place of the chart's formatTooltip. */
+  format?: (value: number | null) => string;
 }
 
 interface LineChartProps {
@@ -366,7 +368,7 @@ export default function LineChart({
                   <span className="swatch" style={{ background: line.color }} aria-hidden="true" />
                   <span className="tooltip-label">{line.label}</span>
                   <span className="tooltip-value">
-                    {(formatTooltip ?? ((value: number | null) => (value === null ? '—' : formatY(value))))(line.values[hover])}
+                    {(line.format ?? formatTooltip ?? ((value: number | null) => (value === null ? '—' : formatY(value))))(line.values[hover])}
                   </span>
                 </div>
               ))}
