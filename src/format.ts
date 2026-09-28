@@ -64,10 +64,22 @@ export function netDrainW(sample: Sample | null): number | null {
 }
 
 /**
- * Hours of battery left at the given drain (the current net drain unless one
- * is passed), or null when solar covers it.
+ * Hours of battery left. While islanded, and once the server has seen the
+ * state of charge fall (socDropPerHour), it is the hours until 0% at that
+ * measured rate — the battery's own accounting, which already includes
+ * conversion losses the AC watts miss. Otherwise it is available Wh at the
+ * given drain (the current net drain unless one is passed), or null when
+ * solar covers it.
  */
-export function runtimeHours(sample: Sample | null, drain: number | null = netDrainW(sample)): number | null {
-  if (!sample?.availWh || drain === null || drain <= 50) return null;
+export function runtimeHours(
+  sample: Sample | null,
+  drain: number | null = netDrainW(sample),
+  socDropPerHour: number | null = null,
+): number | null {
+  if (!sample) return null;
+  if (sample.offGrid && socDropPerHour !== null && socDropPerHour > 0 && sample.soc !== null) {
+    return sample.soc / socDropPerHour;
+  }
+  if (!sample.availWh || drain === null || drain <= 50) return null;
   return sample.availWh / drain;
 }

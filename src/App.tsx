@@ -95,7 +95,11 @@ export default function App() {
 
   const sample = status?.sample ?? null;
   const avgDrainW = status?.avgDrainW?.[settings.runtimeAvgHours] ?? null;
-  const alerts = useMemo(() => evaluate(sample, avgDrainW, settings), [sample, avgDrainW, settings]);
+  const socDrop = status?.socDropPerHour?.[settings.runtimeAvgHours] ?? null;
+  const alerts = useMemo(
+    () => evaluate(sample, avgDrainW, settings, socDrop),
+    [sample, avgDrainW, settings, socDrop],
+  );
 
   // Fire notifications only on the edge — when an alert first appears.
   useEffect(() => {
@@ -131,7 +135,8 @@ export default function App() {
     { key: 'batt', label: 'Battery', color: COLORS.batt, values: history.map((row) => row.battW) },
   ], [history]);
 
-  const hours = runtimeHours(sample, avgDrainW);
+  const hours = runtimeHours(sample, avgDrainW, socDrop);
+  const fromSocDrop = Boolean(sample?.offGrid && socDrop !== null && socDrop > 0);
   const connectionProblem = Boolean(fetchError) || Boolean(status && !status.ok);
 
   return (
@@ -230,7 +235,7 @@ export default function App() {
                 ? (avgDrainW !== null && avgDrainW <= 50 ? 'solar covering load' : '—')
                 : `${formatDuration(hours)} ${sample?.offGrid ? 'left' : 'if grid dropped'}`}
               <span className="note runtime-note">
-                {' '}averaged over{' '}
+                {fromSocDrop ? ' from the charge drop over' : ' averaged over'}{' '}
                 <select
                   aria-label="Runtime averaging window"
                   value={settings.runtimeAvgHours}

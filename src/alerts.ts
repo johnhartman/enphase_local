@@ -31,7 +31,12 @@ export function saveSettings(settings: AlertSettings): void {
  * Active alerts for a sample. Every alert carries an icon and a label, so the
  * status colour is never the only thing carrying meaning.
  */
-export function evaluate(sample: Sample | null, avgDrainW: number | null, settings: AlertSettings): Alert[] {
+export function evaluate(
+  sample: Sample | null,
+  avgDrainW: number | null,
+  settings: AlertSettings,
+  socDropPerHour: number | null = null,
+): Alert[] {
   if (!sample) return [];
   const active: Alert[] = [];
 
@@ -65,14 +70,16 @@ export function evaluate(sample: Sample | null, avgDrainW: number | null, settin
     });
   }
 
-  const hours = runtimeHours(sample, avgDrainW);
+  const hours = runtimeHours(sample, avgDrainW, socDropPerHour);
   if (hours !== null && hours < settings.runtimeBelow) {
     active.push({
       id: 'runtime',
       level: 'critical',
       icon: '⏱',
       title: `About ${hours.toFixed(1)}h of battery left`,
-      detail: `Below your ${settings.runtimeBelow}h threshold at the last ${settings.runtimeAvgHours}h average draw.`,
+      detail: socDropPerHour !== null
+        ? `Below your ${settings.runtimeBelow}h threshold at the charge drop seen over the last ${settings.runtimeAvgHours}h.`
+        : `Below your ${settings.runtimeBelow}h threshold at the last ${settings.runtimeAvgHours}h average draw.`,
     });
   }
 

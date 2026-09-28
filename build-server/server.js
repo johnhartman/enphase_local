@@ -281,7 +281,9 @@ function sampleDrainW(sample) {
         return sample.battW;
     if (sample.loadW === null)
         return null;
-    return sample.solarW === null ? sample.loadW : sample.loadW - Math.max(0, sample.solarW);
+    // Solar beyond the load would charge the battery, not drain it, so an
+    // exporting sample counts as zero drain rather than pulling the mean negative.
+    return sample.solarW === null ? sample.loadW : Math.max(0, sample.loadW - Math.max(0, sample.solarW));
 }
 const AVG_DRAIN_HOURS = [1, 6, 24, 48];
 /**
@@ -304,6 +306,45 @@ function averageDrainW() {
             }
         }
         out[hours] = count ? sum / count : null;
+    }
+    return out;
+}
+/**
+ * How fast the battery's own state of charge is falling while islanded, in
+ * SOC points per hour, over each of the last 1/6/24/48 hours but never
+ * reaching back before the current outage began. Null on grid, or until the
+ * outage has run 10 minutes and the SOC has moved.
+ *
+ * In the 2026-09-28 outage the gateway's available Wh fell 1150 Wh while the
+ * batteries delivered 879 Wh of AC, so runtime from availWh / AC watts
+ * overstated by about a quarter. The SOC rate folds in whatever the gap is.
+ */
+const SOC_RATE_MIN_SECONDS = 600;
+function socDropPerHour() {
+    const out = {};
+    const open = outages[outages.length - 1];
+    const offGrid = latest?.offGrid && open && open.endTime === null;
+    const now = Math.round(Date.now() / 1000);
+    for (const hours of AVG_DRAIN_HOURS) {
+        out[hours] = null;
+        if (!offGrid)
+            continue;
+        const since = Math.max(now - hours * 3600, open.startTime);
+        let first = null;
+        let last = null;
+        for (const row of history) {
+            if (row.t < since || row.soc === null)
+                continue;
+            if (!first)
+                first = row;
+            last = row;
+        }
+        if (!first || !last || last.t - first.t < SOC_RATE_MIN_SECONDS)
+            continue;
+        const drop = first.soc - last.soc;
+        if (drop <= 0)
+            continue;
+        out[hours] = drop / ((last.t - first.t) / 3600);
     }
     return out;
 }
@@ -535,6 +576,7 @@ const server = https.createServer(ensureCertificate(), (req, res) => {
             error: lastError,
             sample: latest && forApi(latest),
             avgDrainW: averageDrainW(),
+            socDropPerHour: socDropPerHour(),
             gatewayHost: activeHost,
             onHotspot: activeHost === CONFIG.fallbackHost,
             sampleSeconds: CONFIG.sampleSeconds,

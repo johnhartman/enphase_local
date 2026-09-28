@@ -35,6 +35,12 @@ export interface StatusResponse {
   sample: Sample | null;
   /** Mean net battery drain in watts, keyed by averaging window in hours (1, 6, 24, 48). */
   avgDrainW: Record<number, number | null>;
+  /**
+   * SOC points lost per hour while islanded, keyed like avgDrainW and never
+   * reaching back before the outage began; null on grid or in the outage's
+   * first 10 minutes. Preferred for the runtime estimate when present.
+   */
+  socDropPerHour: Record<number, number | null>;
   gatewayHost: string;
   onHotspot: boolean;
   sampleSeconds: number;
