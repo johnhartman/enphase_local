@@ -152,7 +152,7 @@ export default function App() {
     // house + battery charging = solar + grid import holds sign for sign.
     {
       key: 'batt',
-      label: 'Battery (+ charging)',
+      label: 'Battery (+ve charging, -ve discharging)',
       endLabel: 'Battery',
       color: COLORS.batt,
       values: history.map((row) => (row.battW === null ? null : -row.battW)),
