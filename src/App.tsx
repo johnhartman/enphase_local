@@ -146,10 +146,9 @@ export default function App() {
   const powerSeries = useMemo<Series[]>(() => [
     { key: 'solar', label: 'Solar', color: COLORS.solar, values: history.map((row) => row.solarW) },
     { key: 'load', label: 'House', color: COLORS.load, values: history.map((row) => row.loadW) },
-    // Shaded and drawn beneath: while islanded the battery carries the whole
-    // house, so this line sits exactly on the house line, which then reads
-    // as the house line riding the edge of the battery's field.
-    { key: 'batt', label: 'Battery', color: COLORS.batt, fill: true, values: history.map((row) => row.battW) },
+    // Drawn beneath the house line: while islanded the battery carries the
+    // whole house, so the two coincide and the house line is the one shown.
+    { key: 'batt', label: 'Battery', color: COLORS.batt, beneath: true, values: history.map((row) => row.battW) },
   ], [history]);
 
   const hours = runtimeHours(sample, avgDrainW, socDrop, whPerPoint);
@@ -262,9 +261,6 @@ export default function App() {
                 >
                   {RANGES.map((value) => <option key={value} value={value}>{value}h</option>)}
                 </select>
-                {!fromSocDrop && whPerPoint !== null && (
-                  <> · calibrated from {calibrationOutages} outage{calibrationOutages === 1 ? '' : 's'}</>
-                )}
               </span>
             </dd>
           </div>
@@ -415,6 +411,12 @@ export default function App() {
         </table>
         {outages.some((row) => row.unmeasuredSeconds > 0) && (
           <p className="note">* Part of this outage had no readings, so the energy totals are incomplete.</p>
+        )}
+        {whPerPoint !== null && (
+          <p className="note">
+            The on-grid runtime estimate is calibrated from {calibrationOutages === 1 ? 'this outage' : `${calibrationOutages} outages`}:
+            the batteries delivered about {Math.round(whPerPoint)} Wh per point of charge.
+          </p>
         )}
       </div>
 

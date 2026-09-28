@@ -7,12 +7,10 @@ export interface Series {
   label: string;
   color: string;
   values: (number | null)[];
-  /**
-   * Also shade between the line and zero, and draw the line beneath any
-   * unfilled series, so a line that coincides with it still shows on top
-   * of the shaded field.
-   */
+  /** Also shade between the line and zero. */
   fill?: boolean;
+  /** Draw before the other lines, so a series that coincides with it stays visible. */
+  beneath?: boolean;
 }
 
 interface LineChartProps {
@@ -302,7 +300,7 @@ export default function LineChart({
               <path key={`${line.key}-fill`} d={line.fillD} fill={line.color} opacity="0.14" />
             ))}
 
-            {[...paths.filter((line) => line.fill), ...paths.filter((line) => !line.fill)].map((line) => (
+            {[...paths.filter((line) => line.beneath), ...paths.filter((line) => !line.beneath)].map((line) => (
               <path
                 key={line.key}
                 d={line.d}
