@@ -122,7 +122,8 @@ async function fetchWithFailover(urlPath, body) {
     const order = activeHost === CONFIG.gatewayHost
         ? [CONFIG.gatewayHost, CONFIG.fallbackHost]
         : [CONFIG.fallbackHost, CONFIG.gatewayHost];
-    let lastError = Object.assign(new Error('unreachable'), { code: 'NET' });
+    const failures = [];
+    let firstError = null;
     for (const host of order) {
         try {
             const data = await gatewayRequest(host, urlPath, body);
@@ -132,12 +133,19 @@ async function fetchWithFailover(urlPath, body) {
             return data;
         }
         catch (err) {
-            lastError = err;
-            if (lastError.code === 'TOKEN')
-                throw lastError; // same on any host
+            const failure = err;
+            if (failure.code === 'TOKEN')
+                throw failure; // same on any host
+            failures.push(`${host}: ${failure.message}`);
+            firstError ??= failure;
         }
     }
-    throw lastError;
+    // The error surfaced is the preferred host's, with every host's own
+    // failure in the message. Before this the fallback's error was reported,
+    // so a timeout on the LAN address showed up as "ENETUNREACH 172.30.1.1".
+    const error = firstError ?? Object.assign(new Error('unreachable'), { code: 'NET' });
+    error.message = failures.join('; ');
+    throw error;
 }
 const mwToW = (value) => (typeof value === 'number' ? value / 1000 : null);
 function pickMeter(payload, section, measurementType) {
@@ -149,11 +157,6 @@ function pickMeter(payload, section, measurementType) {
 }
 async function takeSample() {
     const secctrl = (await fetchWithFailover('/ivp/ensemble/secctrl'));
-    let production = null;
-    try {
-        production = (await fetchWithFailover('/production.json?details=1'));
-    }
-    catch { /* meters are optional; SOC is the thing that matters */ }
     let relay = null;
     try {
         relay = (await fetchWithFailover('/ivp/ensemble/relay'));
@@ -173,24 +176,6 @@ async function takeSample() {
             live = status.meters;
     }
     catch { /* stream unavailable; SOC is the thing that matters */ }
-    // Livedata is the primary source for power. During the 2026-09-28 outage
-    // production.json reported 0 W for production and both consumption meters
-    // while livedata showed the real 734 W load; production.json is only the
-    // fallback for when the live stream is unavailable.
-    let solarW = mwToW(live?.pv?.agg_p_mw);
-    let loadW = mwToW(live?.load?.agg_p_mw);
-    let gridW = mwToW(live?.grid?.agg_p_mw);
-    const battW = mwToW(live?.storage?.agg_p_mw);
-    if (solarW === null)
-        solarW = pickMeter(production, 'production', 'production');
-    if (solarW === null) {
-        const inverters = production?.production?.find((entry) => entry.type === 'inverters');
-        solarW = typeof inverters?.wNow === 'number' ? inverters.wNow : null;
-    }
-    if (loadW === null)
-        loadW = pickMeter(production, 'consumption', 'total-consumption');
-    if (gridW === null)
-        gridW = pickMeter(production, 'consumption', 'net-consumption');
     let offGrid;
     if (typeof relay?.mains_oper_state === 'string') {
         offGrid = relay.mains_oper_state === 'open';
@@ -202,6 +187,33 @@ async function takeSample() {
         // Neither source answered; keep the last known state rather than
         // inventing a grid restore in the middle of an outage.
         offGrid = latest?.offGrid ?? false;
+    }
+    // Livedata is the primary source for power. During the 2026-09-28 outage
+    // production.json reported 0 W for production and both consumption meters
+    // while livedata showed the real 734 W load (and took 4–10 s to answer), so
+    // it is only consulted on grid, and only when the live stream is missing
+    // something. Islanded with no livedata, the power fields stay null and the
+    // outage record counts the gap as unmeasured rather than as zero load.
+    let solarW = mwToW(live?.pv?.agg_p_mw);
+    let loadW = mwToW(live?.load?.agg_p_mw);
+    let gridW = mwToW(live?.grid?.agg_p_mw);
+    const battW = mwToW(live?.storage?.agg_p_mw);
+    if (!offGrid && (solarW === null || loadW === null || gridW === null)) {
+        let production = null;
+        try {
+            production = (await fetchWithFailover('/production.json?details=1'));
+        }
+        catch { /* meters are optional; SOC is the thing that matters */ }
+        if (solarW === null)
+            solarW = pickMeter(production, 'production', 'production');
+        if (solarW === null) {
+            const inverters = production?.production?.find((entry) => entry.type === 'inverters');
+            solarW = typeof inverters?.wNow === 'number' ? inverters.wNow : null;
+        }
+        if (loadW === null)
+            loadW = pickMeter(production, 'consumption', 'total-consumption');
+        if (gridW === null)
+            gridW = pickMeter(production, 'consumption', 'net-consumption');
     }
     const capWh = secctrl.Enc_max_available_capacity ?? secctrl.Max_energy ?? null;
     // A gateway that has just rebooted answers before it has re-discovered the
@@ -468,7 +480,7 @@ async function runPoll() {
                 }
                 : {
                     kind: 'network',
-                    message: `Cannot reach the gateway (${failure.message}). Tried ${CONFIG.gatewayHost} and ${CONFIG.fallbackHost}.`,
+                    message: `Cannot reach the gateway (${failure.message}).`,
                 };
         console.error('[poll]', lastError.message);
         // A rejected token with auto-refresh configured: try to fix it now.
