@@ -130,6 +130,15 @@ npm start
 `npm run dev` gives hot reload at http://localhost:5173 (proxying `/api` to a
 running server).
 
+### Replaying a captured gateway state
+
+`docs/gateway-captures/` holds JSON snapshots of the real gateway (see its
+README for what each one is). `./test/replay.sh docs/gateway-captures/<dir>`
+serves one through a stand-in gateway on localhost and runs the real server
+against it for 45 s, then prints the sample it took, its log, and the outage
+file. Nothing on the appliance is touched. Take a new snapshot with
+`./deploy/capture-gateway.sh <label>` on any machine that has `.enphase_token`.
+
 ## Files the server writes
 
 - `.enphase_token` — current gateway token (auto-updated when refresh is on)
