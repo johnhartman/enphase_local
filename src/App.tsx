@@ -18,9 +18,10 @@ const RANGES = [1, 6, 24, 48] as const;
 // Categorical slots 1–3 of the validated palette. The CSS custom properties
 // carry the light and dark steps, so the charts restep with the theme.
 const COLORS = {
-  solar: 'var(--series-1)',
+  // Battery is the same blue in both charts and its tile; solar is green.
+  batt: 'var(--series-1)',
   load: 'var(--series-2)',
-  batt: 'var(--series-3)',
+  solar: 'var(--series-3)',
 } as const;
 
 async function getJson<T>(url: string): Promise<T> {
@@ -136,7 +137,7 @@ export default function App() {
   const socSeries = useMemo<Series[]>(() => [{
     key: 'soc',
     label: 'Charge',
-    color: COLORS.solar,
+    color: COLORS.batt,
     values: history.map((row) => row.soc),
   }], [history]);
   const powerSeries = useMemo<Series[]>(() => [
