@@ -143,7 +143,9 @@ export default function App() {
   const powerSeries = useMemo<Series[]>(() => [
     { key: 'solar', label: 'Solar', color: COLORS.solar, values: history.map((row) => row.solarW) },
     { key: 'load', label: 'House', color: COLORS.load, values: history.map((row) => row.loadW) },
-    { key: 'batt', label: 'Battery', color: COLORS.batt, values: history.map((row) => row.battW) },
+    // Dashed: while islanded the battery carries the whole house, so this
+    // line sits exactly on the house line and would otherwise hide it.
+    { key: 'batt', label: 'Battery', color: COLORS.batt, dashed: true, values: history.map((row) => row.battW) },
   ], [history]);
 
   const hours = runtimeHours(sample, avgDrainW, socDrop);

@@ -7,6 +7,8 @@ export interface Series {
   label: string;
   color: string;
   values: (number | null)[];
+  /** Dashed stroke, so a line that coincides with another still shows both. */
+  dashed?: boolean;
 }
 
 interface LineChartProps {
@@ -299,6 +301,7 @@ export default function LineChart({
                 fill="none"
                 stroke={line.color}
                 strokeWidth="2"
+                strokeDasharray={line.dashed ? '6 5' : undefined}
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
