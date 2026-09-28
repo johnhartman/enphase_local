@@ -198,6 +198,8 @@ body {
 .grid-state.on::before { content: "● "; color: var(--status-good); }
 .grid-state.off { color: var(--status-critical); }
 .grid-state.off::before { content: "⚠ "; }
+.grid-state.unknown { color: var(--text-secondary); }
+.grid-state.unknown::before { content: "? "; }
 
 .hero-figure { display: flex; align-items: baseline; gap: 4px; margin: 6px 0 10px; }
 .hero-value { font-size: 64px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }

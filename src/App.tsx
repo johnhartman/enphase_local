@@ -153,7 +153,9 @@ export default function App() {
           <div className={`conn ${connectionProblem ? 'bad' : 'good'}`}>
             <span className="dot" aria-hidden="true" />
             {connectionProblem
-              ? 'no data'
+              ? (sample
+                ? `no fresh data · last reading ${formatAgo(sample.t, status?.serverTime ?? Date.now() / 1000)}`
+                : 'no data')
               : `updated ${formatAgo(sample?.t, status?.serverTime ?? Date.now() / 1000)}`}
           </div>
           <div className="range theme-modes" role="radiogroup" aria-label="Appearance">
@@ -202,8 +204,8 @@ export default function App() {
       <section className="hero" aria-label="Battery state of charge">
         <div className="hero-top">
           <span className="hero-label">Battery</span>
-          <span className={`grid-state ${sample?.offGrid ? 'off' : 'on'}`}>
-            {sample?.offGrid ? 'OFF GRID' : 'on grid'}
+          <span className={`grid-state ${sample?.offGrid === true ? 'off' : sample?.offGrid === false ? 'on' : 'unknown'}`}>
+            {sample?.offGrid === true ? 'OFF GRID' : sample?.offGrid === false ? 'on grid' : 'grid state unknown'}
           </span>
         </div>
         <div className="hero-figure">
@@ -269,12 +271,16 @@ export default function App() {
         />
         <Tile
           label="Grid"
-          value={sample?.offGrid
+          value={sample?.offGrid === true
             ? 'islanded'
-            : formatW(typeof sample?.gridW === 'number' ? Math.abs(sample.gridW) : null)}
-          detail={sample?.offGrid
+            : sample?.offGrid === false
+              ? formatW(typeof sample?.gridW === 'number' ? Math.abs(sample.gridW) : null)
+              : '—'}
+          detail={sample?.offGrid === true
             ? 'no utility power'
-            : (typeof sample?.gridW === 'number' ? (sample.gridW > 0 ? 'importing' : 'exporting') : '')}
+            : sample?.offGrid === false
+              ? (typeof sample?.gridW === 'number' ? (sample.gridW > 0 ? 'importing' : 'exporting') : '')
+              : 'state unknown'}
         />
       </section>
 
@@ -337,7 +343,7 @@ export default function App() {
                   <td>{formatW(row.solarW)}</td>
                   <td>{formatW(row.loadW)}</td>
                   <td>{formatW(row.battW)}</td>
-                  <td>{row.offGrid ? 'islanded' : formatW(row.gridW)}</td>
+                  <td>{row.offGrid === true ? 'islanded' : row.offGrid === false ? formatW(row.gridW) : '—'}</td>
                 </tr>
               ))}
             </tbody>

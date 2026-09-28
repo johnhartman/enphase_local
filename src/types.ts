@@ -13,7 +13,8 @@ export interface Sample {
   /** Backup reserve setting, percent. 100 means full-backup mode. */
   reservePct: number | null;
   /** True when the system has islanded — the grid is down. */
-  offGrid: boolean;
+  /** null when the server could not determine the grid state. */
+  offGrid: boolean | null;
   shutdown: boolean;
   solarW: number | null;
   loadW: number | null;

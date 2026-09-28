@@ -185,8 +185,9 @@ async function takeSample() {
     }
     else {
         // Neither source answered; keep the last known state rather than
-        // inventing a grid restore in the middle of an outage.
-        offGrid = latest?.offGrid ?? false;
+        // inventing a grid restore in the middle of an outage. With nothing
+        // known at all it stays null and the dashboard says so, not "on grid".
+        offGrid = latest?.offGrid ?? null;
     }
     // Livedata is the primary source for power. During the 2026-09-28 outage
     // production.json reported 0 W for production and both consumption meters
@@ -198,7 +199,7 @@ async function takeSample() {
     let loadW = mwToW(live?.load?.agg_p_mw);
     let gridW = mwToW(live?.grid?.agg_p_mw);
     const battW = mwToW(live?.storage?.agg_p_mw);
-    if (!offGrid && (solarW === null || loadW === null || gridW === null)) {
+    if (offGrid === false && (solarW === null || loadW === null || gridW === null)) {
         let production = null;
         try {
             production = (await fetchWithFailover('/production.json?details=1'));
@@ -261,6 +262,12 @@ function loadHistory() {
         history.sort((a, b) => a.t - b.t);
         pruneHistory();
         console.log(`[history] loaded ${history.length} samples from ${path.basename(CONFIG.historyFile)}`);
+        // Show the last recorded sample (at its real age) until the first poll
+        // succeeds, so a restart while the gateway is rebooting does not leave
+        // the dashboard blank.
+        latest = history[history.length - 1] ?? null;
+        if (latest)
+            console.log(`[history] showing the last sample from ${new Date(latest.t * 1000).toISOString()} until the gateway answers`);
     }
     catch {
         console.log('[history] starting a new history file');
@@ -335,7 +342,7 @@ const SOC_RATE_MIN_SECONDS = 600;
 function socDropPerHour() {
     const out = {};
     const open = outages[outages.length - 1];
-    const offGrid = latest?.offGrid && open && open.endTime === null;
+    const offGrid = latest?.offGrid === true && open && open.endTime === null;
     const now = Math.round(Date.now() / 1000);
     for (const hours of AVG_DRAIN_HOURS) {
         out[hours] = null;
@@ -404,7 +411,7 @@ function trackOutage(previous, sample) {
     const last = outages[outages.length - 1];
     const open = last && last.endTime === null ? last : null;
     if (!open) {
-        if (!sample.offGrid)
+        if (sample.offGrid !== true)
             return;
         outages.push({
             startTime: sample.t,
@@ -439,7 +446,8 @@ function trackOutage(previous, sample) {
             open.unmeasuredSeconds += seconds;
         }
     }
-    if (!sample.offGrid) {
+    // Only a definite "on grid" closes the outage; an unknown state leaves it open.
+    if (sample.offGrid === false) {
         open.endTime = sample.t;
         open.socEnd = sample.soc;
         console.log(`[outage] grid restored after ${formatSpan(open.endTime - open.startTime)} — battery `
