@@ -31,6 +31,11 @@ async function getJson<T>(url: string): Promise<T> {
 
 export default function App() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
+  // When the current status arrived (browser clock) and a once-a-second tick,
+  // so the reading's age keeps counting between fetches instead of freezing
+  // at whatever it was when the server answered.
+  const [receivedAt, setReceivedAt] = useState<number>(() => Date.now());
+  const [clock, setClock] = useState<number>(() => Date.now());
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [history, setHistory] = useState<Sample[]>([]);
   const [outages, setOutages] = useState<Outage[]>([]);
@@ -57,7 +62,7 @@ export default function App() {
     const tick = async () => {
       try {
         const data = await getJson<StatusResponse>('/api/status');
-        if (!cancelled) { setStatus(data); setFetchError(null); }
+        if (!cancelled) { setStatus(data); setReceivedAt(Date.now()); setFetchError(null); }
       } catch (err) {
         if (!cancelled) setFetchError(err instanceof Error ? err.message : String(err));
       }
@@ -65,6 +70,11 @@ export default function App() {
     void tick();
     const timer = window.setInterval(() => { void tick(); }, STATUS_POLL_MS);
     return () => { cancelled = true; window.clearInterval(timer); };
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -138,6 +148,8 @@ export default function App() {
   const hours = runtimeHours(sample, avgDrainW, socDrop);
   const fromSocDrop = Boolean(sample?.offGrid && socDrop !== null && socDrop > 0);
   const connectionProblem = Boolean(fetchError) || Boolean(status && !status.ok);
+  // The server's clock at the last response, advanced by the time since.
+  const nowOnServer = (status?.serverTime ?? receivedAt / 1000) + (clock - receivedAt) / 1000;
 
   return (
     <div className="app">
@@ -153,10 +165,8 @@ export default function App() {
           <div className={`conn ${connectionProblem ? 'bad' : 'good'}`}>
             <span className="dot" aria-hidden="true" />
             {connectionProblem
-              ? (sample
-                ? `no fresh data · last reading ${formatAgo(sample.t, status?.serverTime ?? Date.now() / 1000)}`
-                : 'no data')
-              : `updated ${formatAgo(sample?.t, status?.serverTime ?? Date.now() / 1000)}`}
+              ? (sample ? `no fresh data · last reading ${formatAgo(sample.t, nowOnServer)}` : 'no data')
+              : `updated ${formatAgo(sample?.t, nowOnServer)}`}
           </div>
           <div className="range theme-modes" role="radiogroup" aria-label="Appearance">
             {THEMES.map(({ value, label }) => (
@@ -377,8 +387,16 @@ export default function App() {
                     {formatSpan(until - row.startTime)}
                     {row.endTime === null && ' — ongoing'}
                   </td>
-                  <td>{formatSoc(row.socStart)} → {row.endTime === null ? '…' : formatSoc(row.socEnd)}</td>
-                  <td>{formatSoc(row.socMin)}</td>
+                  <td>
+                    {formatSoc(row.socStart)} → {row.endTime === null
+                      ? `${formatSoc(sample?.soc ?? row.socMin)} so far`
+                      : formatSoc(row.socEnd)}
+                  </td>
+                  <td>
+                    {formatSoc(row.endTime === null && sample?.soc !== null && sample?.soc !== undefined
+                      ? Math.min(row.socMin ?? sample.soc, sample.soc)
+                      : row.socMin)}
+                  </td>
                   <td>{formatKwh(row.loadWh, 2)}{row.unmeasuredSeconds > 0 && '*'}</td>
                   <td>{formatKwh(row.solarWh, 2)}{row.unmeasuredSeconds > 0 && '*'}</td>
                 </tr>

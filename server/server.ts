@@ -299,6 +299,11 @@ async function takeSample(): Promise<Sample> {
   if (capWh === 0) {
     throw Object.assign(new Error('reports no battery capacity'), { code: 'NOTREADY' });
   }
+  // Seen 2026-09-28: mid-restart the gateway had capacity and SOC back but
+  // state of health 0 and every power figure 0. Same treatment.
+  if (secctrl.ENC_agg_soh === 0) {
+    throw Object.assign(new Error('reports battery health 0%'), { code: 'NOTREADY' });
+  }
 
   return {
     t: Math.round(Date.now() / 1000),
@@ -536,9 +541,9 @@ function trackOutage(previous: Sample | null, sample: Sample): void {
 }
 
 // While the gateway is down, each poll blocks for the full timeout on both
-// hosts, and every dashboard refresh would otherwise queue another one. Share
-// the in-flight poll instead, so callers wait on the same request and no burst
-// of stacked samples lands when the gateway comes back.
+// hosts, longer than the sampling interval, so the timer would otherwise
+// stack polls. Share the in-flight one instead, so no burst of samples lands
+// when the gateway comes back.
 let inFlight: Promise<void> | null = null;
 
 function poll(): Promise<void> {
@@ -691,10 +696,10 @@ const server = https.createServer(ensureCertificate(), (req: IncomingMessage, re
       serverTime: Math.round(Date.now() / 1000),
       token: tokens.status(),
     });
-    // Refresh on demand if the background sample is stale.
-    const age = latest ? Date.now() / 1000 - latest.t : Infinity;
-    if (age > Math.min(CONFIG.sampleSeconds, 10)) void poll().then(respond);
-    else respond();
+    // Serve the background sample as is. Polling on demand here meant every
+    // open dashboard tab had the gateway polled about every 10 s instead of
+    // every 30 s, which is not kind to a gateway that restarts under load.
+    respond();
     return;
   }
 
