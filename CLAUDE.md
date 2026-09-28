@@ -17,8 +17,12 @@ run as an unattended appliance.
   (`rejectUnauthorized: false` is intentional). Renewal URL:
   `https://enlighten.enphaseenergy.com/entrez-auth-token?serial_num=482513006020`
 - Key endpoints: `/ivp/ensemble/secctrl` (agg_soc = battery %),
-  `/production.json?details=1` (solar/load/grid W),
-  `/ivp/livedata/status` (battery flow, milliwatts — divide by 1000).
+  `/ivp/ensemble/relay` (`mains_oper_state` "open" = islanded — verified in
+  the 2026-09-28 outage; secctrl's `offgrid_secctrl.is_active` stayed false),
+  `/ivp/livedata/status` (solar/load/grid/battery, milliwatts — divide by
+  1000; `main_relay_state` 0 = islanded), `/production.json?details=1`
+  (fallback only — its meters all read 0 W while islanded, and it answered
+  in 4–10 s during the outage).
 
 ## Architecture
 
@@ -67,15 +71,15 @@ run as an unattended appliance.
 
 ## Open verification items
 
-- First run against the real gateway: confirm `/api/status` returns soc 100,
-  offGrid false.
-- Battery sign convention: `battW > 0` is rendered as "discharging"
-  (from livedata `storage.agg_p_mw`). Verify next time the battery actually
-  charges; if reversed, flip the comparisons where `battW` is consumed
-  (`src/App.tsx` tile + `src/format.ts` netDrainW) — the server stores the
-  raw signed value.
-- Auto-refresh: first monthly token refresh happens ~30 days after token
-  creation (2026-08-23); check `monitor.log` for `[token]` lines.
+- Battery sign convention: verified 2026-09-28 while islanded — livedata
+  `storage.agg_p_mw` was +734280 with load 734 W, solar 0, grid 0, so
+  `battW > 0` really is discharging.
+- Auto-refresh: verified — `/api/status` on 2026-09-28 showed lastRefresh ok
+  on 2026-09-22, "new token valid until 2027-09-22".
+- Grid restore: the relay-based detection (deployed during the 2026-09-28
+  outage) has only been seen in the islanded state. When power returns,
+  confirm `mains_oper_state` goes back to "closed", the dashboard flips to
+  "on grid", and `outages.jsonl` gets an `endTime` for that outage.
 
 ## Conventions
 

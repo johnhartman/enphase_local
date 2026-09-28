@@ -154,7 +154,12 @@ async function takeSample() {
         production = (await fetchWithFailover('/production.json?details=1'));
     }
     catch { /* meters are optional; SOC is the thing that matters */ }
-    let live = undefined;
+    let relay = null;
+    try {
+        relay = (await fetchWithFailover('/ivp/ensemble/relay'));
+    }
+    catch { /* livedata's main_relay_state covers it below */ }
+    let live;
     try {
         let status = (await fetchWithFailover('/ivp/livedata/status'));
         if (status?.connection?.sc_stream !== 'enabled') {
@@ -168,22 +173,35 @@ async function takeSample() {
             live = status.meters;
     }
     catch { /* stream unavailable; SOC is the thing that matters */ }
-    let solarW = pickMeter(production, 'production', 'production');
+    // Livedata is the primary source for power. During the 2026-09-28 outage
+    // production.json reported 0 W for production and both consumption meters
+    // while livedata showed the real 734 W load; production.json is only the
+    // fallback for when the live stream is unavailable.
+    let solarW = mwToW(live?.pv?.agg_p_mw);
+    let loadW = mwToW(live?.load?.agg_p_mw);
+    let gridW = mwToW(live?.grid?.agg_p_mw);
+    const battW = mwToW(live?.storage?.agg_p_mw);
+    if (solarW === null)
+        solarW = pickMeter(production, 'production', 'production');
     if (solarW === null) {
         const inverters = production?.production?.find((entry) => entry.type === 'inverters');
         solarW = typeof inverters?.wNow === 'number' ? inverters.wNow : null;
     }
-    let loadW = pickMeter(production, 'consumption', 'total-consumption');
-    let gridW = pickMeter(production, 'consumption', 'net-consumption');
-    let battW = null;
-    if (live) {
-        battW = mwToW(live.storage?.agg_p_mw);
-        if (solarW === null)
-            solarW = mwToW(live.pv?.agg_p_mw);
-        if (loadW === null)
-            loadW = mwToW(live.load?.agg_p_mw);
-        if (gridW === null)
-            gridW = mwToW(live.grid?.agg_p_mw);
+    if (loadW === null)
+        loadW = pickMeter(production, 'consumption', 'total-consumption');
+    if (gridW === null)
+        gridW = pickMeter(production, 'consumption', 'net-consumption');
+    let offGrid;
+    if (typeof relay?.mains_oper_state === 'string') {
+        offGrid = relay.mains_oper_state === 'open';
+    }
+    else if (typeof live?.main_relay_state === 'number') {
+        offGrid = live.main_relay_state === 0;
+    }
+    else {
+        // Neither source answered; keep the last known state rather than
+        // inventing a grid restore in the middle of an outage.
+        offGrid = latest?.offGrid ?? false;
     }
     const capWh = secctrl.Enc_max_available_capacity ?? secctrl.Max_energy ?? null;
     // A gateway that has just rebooted answers before it has re-discovered the
@@ -200,7 +218,7 @@ async function takeSample() {
         capWh,
         sohPct: secctrl.ENC_agg_soh ?? null,
         reservePct: secctrl.configured_backup_soc ?? null,
-        offGrid: Boolean(secctrl.offgrid_secctrl?.is_active),
+        offGrid,
         shutdown: Boolean(secctrl.shutdown),
         solarW,
         loadW,
