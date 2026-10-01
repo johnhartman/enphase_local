@@ -6,7 +6,8 @@ import {
 import {
   beep, canNotify, DEFAULT_SETTINGS, evaluate, loadSettings, notify, saveSettings,
 } from './alerts.js';
-import { applyTheme, loadTheme, saveTheme, THEMES, type Theme } from './theme.js';
+import { applyTheme, loadTheme, saveTheme, type Theme } from './theme.js';
+import ThemeMenu from './ThemeMenu.js';
 import type {
   AlertSettings, HistoryResponse, Outage, OutagesResponse, Sample, StatusResponse,
 } from './types.js';
@@ -184,20 +185,7 @@ export default function App() {
               ? (sample ? `no fresh data · last reading ${formatAgo(sample.t, nowOnServer)}` : 'no data')
               : `updated ${formatAgo(sample?.t, nowOnServer)}`}
           </div>
-          <div className="range theme-modes" role="radiogroup" aria-label="Appearance">
-            {THEMES.map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                role="radio"
-                aria-checked={theme === value}
-                className={theme === value ? 'active' : ''}
-                onClick={() => chooseTheme(value)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <ThemeMenu theme={theme} onChange={chooseTheme} />
         </div>
       </header>
 

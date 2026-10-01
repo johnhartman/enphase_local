@@ -1,9 +1,10 @@
 export type Theme = 'system' | 'light' | 'dark';
 
+/** Menu order, matching the manja project's theme-mode toggle. */
 export const THEMES: ReadonlyArray<{ value: Theme; label: string }> = [
-  { value: 'system', label: 'System' },
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'System' },
 ];
 
 const STORAGE_KEY = 'enphase-local-theme';
