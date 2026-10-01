@@ -51,6 +51,13 @@ interface Sample {
   capWh: number | null;
   sohPct: number | null;
   reservePct: number | null;
+  /**
+   * Battery profile as the gateway reports it in its tariff settings —
+   * "backup", "self-consumption" or "economy" — the Enlighten app's
+   * "System Profile" (Full Backup / Self-Consumption / Savings). null until
+   * the first successful read.
+   */
+  profile: string | null;
   /** null when neither the relay nor livedata answered and nothing earlier is known. */
   offGrid: boolean | null;
   shutdown: boolean;
@@ -225,6 +232,10 @@ interface LivedataPayload {
   connection?: { sc_stream?: string };
   meters?: LivedataMeters;
 }
+// /admin/lib/tariff. Only storage_settings.mode is used; the same response
+// also carries a "schedule" block whose battery_mode disagreed with it on
+// 2026-09-29 (self-consumption/30 % vs backup/100 %), so it is left alone.
+interface TariffPayload { tariff?: { storage_settings?: { mode?: string } } }
 
 function pickMeter(payload: ProductionPayload | null, section: 'production' | 'consumption', measurementType: string): number | null {
   const list = payload?.[section];
@@ -253,6 +264,15 @@ async function takeSample(): Promise<Sample> {
     }
     if (status?.connection?.sc_stream === 'enabled') live = status.meters;
   } catch { /* stream unavailable; SOC is the thing that matters */ }
+
+  // The profile is a setting, not a reading, so a failed read keeps the last
+  // one seen rather than blanking it for a sample.
+  let profile: string | null = latest?.profile ?? null;
+  try {
+    const tariff = (await fetchWithFailover('/admin/lib/tariff')) as TariffPayload;
+    const mode = tariff?.tariff?.storage_settings?.mode;
+    if (typeof mode === 'string' && mode !== '') profile = mode;
+  } catch { /* informational; SOC is the thing that matters */ }
 
   let offGrid: boolean | null;
   if (typeof relay?.mains_oper_state === 'string') {
@@ -312,6 +332,7 @@ async function takeSample(): Promise<Sample> {
     capWh,
     sohPct: secctrl.ENC_agg_soh ?? null,
     reservePct: secctrl.configured_backup_soc ?? null,
+    profile,
     offGrid,
     shutdown: Boolean(secctrl.shutdown),
     solarW,

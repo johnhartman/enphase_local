@@ -176,6 +176,16 @@ async function takeSample() {
             live = status.meters;
     }
     catch { /* stream unavailable; SOC is the thing that matters */ }
+    // The profile is a setting, not a reading, so a failed read keeps the last
+    // one seen rather than blanking it for a sample.
+    let profile = latest?.profile ?? null;
+    try {
+        const tariff = (await fetchWithFailover('/admin/lib/tariff'));
+        const mode = tariff?.tariff?.storage_settings?.mode;
+        if (typeof mode === 'string' && mode !== '')
+            profile = mode;
+    }
+    catch { /* informational; SOC is the thing that matters */ }
     let offGrid;
     if (typeof relay?.mains_oper_state === 'string') {
         offGrid = relay.mains_oper_state === 'open';
@@ -236,6 +246,7 @@ async function takeSample() {
         capWh,
         sohPct: secctrl.ENC_agg_soh ?? null,
         reservePct: secctrl.configured_backup_soc ?? null,
+        profile,
         offGrid,
         shutdown: Boolean(secctrl.shutdown),
         solarW,

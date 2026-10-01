@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import LineChart, { type Series } from './LineChart.js';
 import {
-  formatAgo, formatClock, formatDateTime, formatDuration, formatKwh, formatW, runtimeHours,
+  formatAgo, formatClock, formatDateTime, formatDuration, formatKwh, formatProfile, formatW, runtimeHours,
 } from './format.js';
 import {
   beep, canNotify, DEFAULT_SETTINGS, evaluate, loadSettings, notify, saveSettings,
@@ -279,6 +279,12 @@ export default function App() {
             <dd>
               {sample?.reservePct ?? '—'}%
               {(sample?.reservePct ?? 0) >= 100 && <span className="note"> full-backup</span>}
+            </dd>
+          </div>
+          <div>
+            <dt>System profile</dt>
+            <dd title={sample?.profile ? `gateway reports "${sample.profile}"` : undefined}>
+              {formatProfile(sample?.profile)}
             </dd>
           </div>
         </dl>

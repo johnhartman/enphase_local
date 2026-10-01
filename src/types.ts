@@ -12,6 +12,11 @@ export interface Sample {
   sohPct: number | null;
   /** Backup reserve setting, percent. 100 means full-backup mode. */
   reservePct: number | null;
+  /**
+   * Battery profile as the gateway reports it: "backup", "self-consumption"
+   * or "economy" — the Enlighten app's "System Profile". null when unknown.
+   */
+  profile: string | null;
   /** True when the system has islanded — the grid is down. */
   /** null when the server could not determine the grid state. */
   offGrid: boolean | null;

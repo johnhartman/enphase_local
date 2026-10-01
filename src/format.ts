@@ -9,6 +9,23 @@ export function formatW(watts: Maybe, { sign = false }: { sign?: boolean } = {})
   return `${prefix}${Math.round(watts)} W`;
 }
 
+/**
+ * The Enlighten app's name for a gateway battery profile value. Unknown
+ * values pass through unchanged so a new one from Enphase still shows.
+ */
+export function formatProfile(profile: string | null | undefined): string {
+  switch (profile) {
+    case 'backup': return 'Full Backup';
+    case 'self-consumption': return 'Self-Consumption';
+    case 'economy':
+    case 'savings-mode': return 'Savings';
+    case null:
+    case undefined:
+    case '': return '—';
+    default: return profile;
+  }
+}
+
 export function formatKwh(wh: Maybe, digits = 1): string {
   if (wh === null || wh === undefined || Number.isNaN(wh)) return '—';
   return `${(wh / 1000).toFixed(digits)} kWh`;

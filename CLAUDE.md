@@ -24,7 +24,11 @@ run as an unattended appliance.
   `/ivp/livedata/status` (solar/load/grid/battery, milliwatts — divide by
   1000; `main_relay_state` 0 = islanded), `/production.json?details=1`
   (fallback only — its meters all read 0 W while islanded, and it answered
-  in 4–10 s during the outage).
+  in 4–10 s during the outage), `/admin/lib/tariff` (`tariff.storage_settings.mode`
+  = battery profile: `backup` / `self-consumption` / `economy`, shown as the
+  app's Full Backup / Self-Consumption / Savings; Storm Guard is NOT exposed
+  by the gateway — verified 2026-09-29 against the gateway's UI bundle and
+  the unofficial API docs).
 
 ## Architecture
 

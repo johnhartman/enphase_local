@@ -25,6 +25,7 @@ for ep in \
   ivp/ensemble/inventory \
   ivp/meters/readings \
   ivp/ensemble/dry_contacts \
+  admin/lib/tariff \
   home.json
 do
   name="$(printf '%s' "$ep" | sed 's/?.*//; s#/#_#g')"
