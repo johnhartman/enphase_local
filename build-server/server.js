@@ -36,6 +36,7 @@ const CONFIG = {
     historyHours: Number(process.env.HISTORY_HOURS || 48),
     historyFile: process.env.HISTORY_FILE || path.join(ROOT, 'history.jsonl'),
     outagesFile: process.env.OUTAGES_FILE || path.join(ROOT, 'outages.jsonl'),
+    outageCapturesDir: process.env.OUTAGE_CAPTURES_DIR || path.join(ROOT, 'outage-captures'),
     requestTimeoutMs: 20000,
     serial: process.env.GATEWAY_SERIAL || '482513006020',
 };
@@ -163,8 +164,9 @@ async function takeSample() {
     }
     catch { /* livedata's main_relay_state covers it below */ }
     let live;
+    let status = null;
     try {
-        let status = (await fetchWithFailover('/ivp/livedata/status'));
+        status = (await fetchWithFailover('/ivp/livedata/status'));
         if (status?.connection?.sc_stream !== 'enabled') {
             // The gateway switches its live stream off on its own and leaves it off
             // until asked again, which is why solar/load/grid/battery would go null
@@ -239,7 +241,7 @@ async function takeSample() {
     if (secctrl.ENC_agg_soh === 0) {
         throw Object.assign(new Error('reports battery health 0%'), { code: 'NOTREADY' });
     }
-    return {
+    const sample = {
         t: Math.round(Date.now() / 1000),
         soc: secctrl.agg_soc ?? null,
         availWh: secctrl.ENC_agg_avail_energy ?? secctrl.Max_energy ?? null,
@@ -254,6 +256,7 @@ async function takeSample() {
         gridW,
         battW,
     };
+    return { sample, raw: { relay, livedata: status } };
 }
 // ---------------------------------------------------------------- history
 let history = [];
@@ -297,8 +300,8 @@ function rewriteHistory() {
             console.error('[history] rewrite failed:', err.message);
     });
 }
-function recordSample(sample) {
-    trackOutage(history[history.length - 1] ?? null, sample);
+function recordSample(sample, raw) {
+    trackOutage(history[history.length - 1] ?? null, sample, raw);
     history.push(sample);
     fs.appendFile(CONFIG.historyFile, JSON.stringify(sample) + '\n', (err) => {
         if (err)
@@ -454,7 +457,36 @@ const formatSpan = (seconds) => {
     return minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`;
 };
 const formatSoc = (soc) => (soc === null ? '—' : `${soc}%`);
-function trackOutage(previous, sample) {
+/**
+ * Save the gateway responses behind the sample that opened an outage, so a
+ * short one can be examined after the rolling history has dropped it. One
+ * directory per outage, named and laid out like deploy/capture-gateway.sh
+ * does it (URL path with "/" -> "_"). The files are the parsed responses
+ * re-serialized, not the gateway's exact bytes.
+ */
+function captureOutageOpen(sample, raw) {
+    const stamp = new Date(sample.t * 1000).toISOString().replace(/:(\d\d):\d\d\.\d+Z$/, '$1Z');
+    const dir = path.join(CONFIG.outageCapturesDir, `${stamp}-outage-open`);
+    const files = [
+        ['ivp_ensemble_relay.json', raw.relay],
+        ['ivp_livedata_status.json', raw.livedata],
+    ];
+    try {
+        fs.mkdirSync(dir, { recursive: true });
+        const saved = [];
+        for (const [name, payload] of files) {
+            if (payload === null || payload === undefined)
+                continue;
+            fs.writeFileSync(path.join(dir, name), JSON.stringify(payload, null, 2) + '\n');
+            saved.push(name);
+        }
+        console.log(`[outage] captured ${saved.length ? saved.join(', ') : 'nothing (neither request answered)'} in ${dir}`);
+    }
+    catch (err) {
+        console.error('[outage] capture failed:', err.message);
+    }
+}
+function trackOutage(previous, sample, raw) {
     const last = outages[outages.length - 1];
     const open = last && last.endTime === null ? last : null;
     if (!open) {
@@ -472,6 +504,7 @@ function trackOutage(previous, sample) {
         });
         console.log(`[outage] grid down at ${new Date(sample.t * 1000).toISOString()}, battery ${formatSoc(sample.soc)}`);
         saveOutages();
+        captureOutageOpen(sample, raw);
         return;
     }
     if (sample.soc !== null) {
@@ -516,9 +549,10 @@ function poll() {
 }
 async function runPoll() {
     try {
-        latest = await takeSample();
+        const { sample, raw } = await takeSample();
+        latest = sample;
         lastError = null;
-        recordSample(latest);
+        recordSample(sample, raw);
     }
     catch (err) {
         const failure = err;

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Replay a captured gateway state through the real server and print what it
 # samples. Everything runs on localhost in a scratch directory; the live
-# appliance, history.jsonl and outages.jsonl are untouched.
+# appliance, history.jsonl, outages.jsonl and outage-captures/ are untouched.
 #
 #   ./test/replay.sh docs/gateway-captures/2026-09-28-islanded [seconds]
 #
@@ -28,6 +28,7 @@ sleep 1
 GATEWAY_HOST=127.0.0.1:$GW_PORT GATEWAY_FALLBACK=127.0.0.1:$GW_PORT \
 PORT=8443 HTTP_PORT=8080 \
 HISTORY_FILE="$WORK/history.jsonl" OUTAGES_FILE="$WORK/outages.jsonl" \
+OUTAGE_CAPTURES_DIR="$WORK/outage-captures" \
 TLS_CERT="$WORK/cert.pem" TLS_KEY="$WORK/key.pem" \
 node "$ROOT/build-server/server.js" > "$WORK/server.log" 2>&1 &
 SRV_PID=$!
@@ -40,6 +41,8 @@ echo "=== server log"
 grep -E '^\[' "$WORK/server.log" || true
 echo "=== outages.jsonl"
 cat "$WORK/outages.jsonl" 2>/dev/null || echo "(none)"
+echo "=== outage captures"
+find "$WORK/outage-captures" -type f -exec ls -l {} \; 2>/dev/null || echo "(none)"
 echo "=== fake gateway requests"
 grep -c 'fake-gateway\] GET\|fake-gateway\] POST' "$WORK/gateway.log" | sed 's/$/ requests served/'
 grep '404' "$WORK/gateway.log" | sort | uniq -c || true

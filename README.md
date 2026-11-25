@@ -117,6 +117,7 @@ router dies mid-outage.
 | `HISTORY_HOURS` | `48` | History retention |
 | `HISTORY_FILE` | `history.jsonl` | Rolling sample history |
 | `OUTAGES_FILE` | `outages.jsonl` | Grid outage log |
+| `OUTAGE_CAPTURES_DIR` | `outage-captures` | Gateway responses saved when an outage opens |
 | `GATEWAY_SERIAL` | `482513006020` | Used in renewal URLs |
 
 ## Rebuilding after changes
@@ -147,6 +148,10 @@ file. Nothing on the appliance is touched. Take a new snapshot with
   start/lowest/end, house and solar Wh while islanded); kept forever and shown
   under "Grid outages" on the dashboard. Start and end also go to the log as
   `[outage]` lines.
+- `outage-captures/<UTC timestamp>-outage-open/` — the gateway's
+  `/ivp/ensemble/relay` and `/ivp/livedata/status` responses behind the sample
+  that opened each outage (`ivp_ensemble_relay.json`,
+  `ivp_livedata_status.json`); kept forever, not in git.
 - `.enphase_credentials.json` — only if you created it; never written by the server
 
 ## Notes

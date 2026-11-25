@@ -40,6 +40,7 @@ const CONFIG = {
   historyHours: Number(process.env.HISTORY_HOURS || 48),
   historyFile: process.env.HISTORY_FILE || path.join(ROOT, 'history.jsonl'),
   outagesFile: process.env.OUTAGES_FILE || path.join(ROOT, 'outages.jsonl'),
+  outageCapturesDir: process.env.OUTAGE_CAPTURES_DIR || path.join(ROOT, 'outage-captures'),
   requestTimeoutMs: 20000,
   serial: process.env.GATEWAY_SERIAL || '482513006020',
 };
@@ -244,7 +245,14 @@ function pickMeter(payload: ProductionPayload | null, section: 'production' | 'c
   return typeof hit?.wNow === 'number' ? hit.wNow : null;
 }
 
-async function takeSample(): Promise<Sample> {
+/**
+ * The relay and livedata responses one sample was built from, as parsed.
+ * null when that request failed. Kept only long enough to be written out if
+ * the sample turns out to open an outage.
+ */
+interface RawPayloads { relay: unknown; livedata: unknown }
+
+async function takeSample(): Promise<{ sample: Sample; raw: RawPayloads }> {
   const secctrl = (await fetchWithFailover('/ivp/ensemble/secctrl')) as SecctrlPayload;
 
   let relay: RelayPayload | null = null;
@@ -253,8 +261,9 @@ async function takeSample(): Promise<Sample> {
   } catch { /* livedata's main_relay_state covers it below */ }
 
   let live: LivedataMeters | undefined;
+  let status: LivedataPayload | null = null;
   try {
-    let status = (await fetchWithFailover('/ivp/livedata/status')) as LivedataPayload;
+    status = (await fetchWithFailover('/ivp/livedata/status')) as LivedataPayload;
     if (status?.connection?.sc_stream !== 'enabled') {
       // The gateway switches its live stream off on its own and leaves it off
       // until asked again, which is why solar/load/grid/battery would go null
@@ -325,7 +334,7 @@ async function takeSample(): Promise<Sample> {
     throw Object.assign(new Error('reports battery health 0%'), { code: 'NOTREADY' });
   }
 
-  return {
+  const sample: Sample = {
     t: Math.round(Date.now() / 1000),
     soc: secctrl.agg_soc ?? null,
     availWh: secctrl.ENC_agg_avail_energy ?? secctrl.Max_energy ?? null,
@@ -340,6 +349,7 @@ async function takeSample(): Promise<Sample> {
     gridW,
     battW,
   };
+  return { sample, raw: { relay, livedata: status } };
 }
 
 // ---------------------------------------------------------------- history
@@ -383,8 +393,8 @@ function rewriteHistory(): void {
   });
 }
 
-function recordSample(sample: Sample): void {
-  trackOutage(history[history.length - 1] ?? null, sample);
+function recordSample(sample: Sample, raw: RawPayloads): void {
+  trackOutage(history[history.length - 1] ?? null, sample, raw);
   history.push(sample);
   fs.appendFile(CONFIG.historyFile, JSON.stringify(sample) + '\n', (err) => {
     if (err) console.error('[history] append failed:', err.message);
@@ -534,7 +544,35 @@ const formatSpan = (seconds: number): string => {
 };
 const formatSoc = (soc: number | null): string => (soc === null ? '—' : `${soc}%`);
 
-function trackOutage(previous: Sample | null, sample: Sample): void {
+/**
+ * Save the gateway responses behind the sample that opened an outage, so a
+ * short one can be examined after the rolling history has dropped it. One
+ * directory per outage, named and laid out like deploy/capture-gateway.sh
+ * does it (URL path with "/" -> "_"). The files are the parsed responses
+ * re-serialized, not the gateway's exact bytes.
+ */
+function captureOutageOpen(sample: Sample, raw: RawPayloads): void {
+  const stamp = new Date(sample.t * 1000).toISOString().replace(/:(\d\d):\d\d\.\d+Z$/, '$1Z');
+  const dir = path.join(CONFIG.outageCapturesDir, `${stamp}-outage-open`);
+  const files: Array<[string, unknown]> = [
+    ['ivp_ensemble_relay.json', raw.relay],
+    ['ivp_livedata_status.json', raw.livedata],
+  ];
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    const saved: string[] = [];
+    for (const [name, payload] of files) {
+      if (payload === null || payload === undefined) continue;
+      fs.writeFileSync(path.join(dir, name), JSON.stringify(payload, null, 2) + '\n');
+      saved.push(name);
+    }
+    console.log(`[outage] captured ${saved.length ? saved.join(', ') : 'nothing (neither request answered)'} in ${dir}`);
+  } catch (err) {
+    console.error('[outage] capture failed:', (err as Error).message);
+  }
+}
+
+function trackOutage(previous: Sample | null, sample: Sample, raw: RawPayloads): void {
   const last = outages[outages.length - 1];
   const open = last && last.endTime === null ? last : null;
 
@@ -552,6 +590,7 @@ function trackOutage(previous: Sample | null, sample: Sample): void {
     });
     console.log(`[outage] grid down at ${new Date(sample.t * 1000).toISOString()}, battery ${formatSoc(sample.soc)}`);
     saveOutages();
+    captureOutageOpen(sample, raw);
     return;
   }
 
@@ -605,9 +644,10 @@ function poll(): Promise<void> {
 
 async function runPoll(): Promise<void> {
   try {
-    latest = await takeSample();
+    const { sample, raw } = await takeSample();
+    latest = sample;
     lastError = null;
-    recordSample(latest);
+    recordSample(sample, raw);
   } catch (err) {
     const failure = err as GatewayFailure;
     lastError = failure.code === 'TOKEN'

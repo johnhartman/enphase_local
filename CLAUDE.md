@@ -48,8 +48,10 @@ run as an unattended appliance.
 - Grid outages (spans of `offGrid` samples) are logged to `outages.jsonl` —
   never pruned, rewritten atomically on every sample while an outage is open
   so it survives a restart. `[outage]` lines in `monitor.log` mark start/end.
+  The relay and livedata responses behind the sample that opens an outage are
+  saved to `outage-captures/<UTC timestamp>-outage-open/` (never pruned).
 - Secrets/state never in git: `.enphase_token`, `.enphase_credentials.json`,
-  `history.jsonl`, `outages.jsonl`, `*.log`, `cert.pem`, `key.pem` (see .gitignore).
+  `history.jsonl`, `outages.jsonl`, `outage-captures/`, `*.log`, `cert.pem`, `key.pem` (see .gitignore).
 
 ## Commands
 
